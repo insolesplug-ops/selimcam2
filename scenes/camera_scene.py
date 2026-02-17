@@ -434,18 +434,21 @@ class CameraScene:
 
             # NO ADDITIONAL 180° FLIP - each mode is self-contained
 
-            # Aspect-preserving cover scale into preview area 480x640
+            # Aspect-preserving scale into preview area 480x800 WITHOUT CROPPING (contain mode)
             src_w, src_h = oriented.get_size()
-            scale = max(preview_w / src_w, preview_h / src_h)
+            scale = min(preview_w / src_w, preview_h / src_h)  # CONTAIN (not COVER)
             scaled_w = max(1, int(round(src_w * scale)))
             scaled_h = max(1, int(round(src_h * scale)))
             scaled = pygame.transform.scale(oriented, (scaled_w, scaled_h))
 
-            # Center crop to final preview surface (480x640)
-            x = max(0, (scaled_w - preview_w) // 2)
-            y = max(0, (scaled_h - preview_h) // 2)
+            # Center on final preview surface (480x800) with black bars if needed
             final = pygame.Surface((preview_w, preview_h))
-            final.blit(scaled, (-x, -y))
+            final.fill((0, 0, 0))  # Black background for pillarbox/letterbox
+            
+            # Center the scaled image
+            x = (preview_w - scaled_w) // 2
+            y = (preview_h - scaled_h) // 2
+            final.blit(scaled, (x, y))
 
             if self._debug_frame_logs:
                 logger.debug(f"[FRAME] Cover scale {src_w}x{src_h} -> {scaled_w}x{scaled_h}, crop ({x},{y}) -> {preview_w}x{preview_h}")
