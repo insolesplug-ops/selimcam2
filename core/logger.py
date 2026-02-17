@@ -44,7 +44,7 @@ class Logger:
     
     def debug(self, msg: str):
         """Log debug message."""
-        self._log("DEBUG", msg, show_console=False)
+        self._log("DEBUG", msg, show_console=True)
     
     def info(self, msg: str):
         """Log info message."""

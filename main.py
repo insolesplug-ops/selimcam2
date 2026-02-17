@@ -1,10 +1,7 @@
 """
 SelimCam v2.0 - PRODUCTION BUILD
 Pi 3A+ | 8MP Camera | Waveshare 4.3" DSI
-FIXES: Software Rotation 90°, Standby 10s, No Stubs
-"""
-
-import os
+FIXES: KMS Hardware Rotation 180deg, Touch Mapping, Debug Logging
 import sys
 import pygame
 import time
@@ -40,10 +37,10 @@ print("[Platform] Raspberry Pi 3A+ - FORCE MODE")
 # ============================================================
 # DISPLAY ROTATION CONSTANTS
 # ============================================================
-# Global software rotation:
-# - Logical app space is portrait (480x800)
-# - Physical framebuffer is landscape (800x480)
-# - Final blit rotates logical surface 90° clockwise
+# KMS Hardware rotation: SDL_VIDEO_KMSDRM_ROTATION="2" (180 degrees)
+# - Logical app space: portrait (480x800), no software rotation
+# - Physical framebuffer: landscape (800x480), rotated 180 degrees by KMS
+# - Touch mapping: (480-x_raw, 800-y_raw) for 180 degree HW rotation
 
 LOGICAL_W  = 480
 LOGICAL_H  = 800
@@ -345,11 +342,11 @@ class SensorThread(threading.Thread):
                 self.last_battery = now
             time.sleep(0.01)
 
-    def get_lux(self)     -> Optional[float]: 
+    def get_lux(self)     -> Optional[float]:
         with self.lock: return self.lux_value
-    def get_tilt(self)    -> float:           
+    def get_tilt(self)    -> float:
         with self.lock: return self.tilt_angle
-    def get_battery(self) -> Optional[int]:   
+    def get_battery(self) -> Optional[int]:
         with self.lock: return self.battery_percent
     def stop(self): self.running = False
 
@@ -456,22 +453,12 @@ class CameraApp:
         except Exception:
             pass
 
-    # ── TOUCH KOORDINATEN (PORTRAIT) ────────────────────────────────
     def _rotate_touch(self, px: int, py: int) -> tuple:
-        """
-        Physical landscape coordinates -> logical portrait coordinates.
-        180° flip mapping (from user spec):
-            x_mapped = LOGICAL_W - x_raw
-            y_mapped = LOGICAL_H - y_raw
-        """
-        lx = int(LOGICAL_W - px)
-        ly = int(LOGICAL_H - py)
-        # Clamp
-        lx = max(0, min(LOGICAL_W - 1, lx))
-        ly = max(0, min(LOGICAL_H - 1, ly))
+        """180 degree flip: x_mapped = 480 - x_raw, y_mapped = 800 - y_raw"""
+        lx = max(0, min(479, int(480 - px)))
+        ly = max(0, min(799, int(800 - py)))
         return (lx, ly)
 
-    # ── HARDWARE INIT ────────────────────────────────────────────────
     def _init_hardware_safe(self) -> dict:
         logger.info("Initializing hardware...")
         av = {}
@@ -805,8 +792,11 @@ class CameraApp:
                     # Logger overlay auf logical_surface
                     logger.render_ui(self.logical_surface)
 
-                    rotated = pygame.transform.rotate(self.logical_surface, 180)
+                    # Scale logical 480x800 to physical 800x480, then rotate 180° for upside-down
+                    scaled = pygame.transform.scale(self.logical_surface, (PHYSICAL_W, PHYSICAL_H))
+                    rotated = pygame.transform.rotate(scaled, 180)
                     self.screen.blit(rotated, (0, 0))
+                    logger.debug(f"[RENDER] Display updated (480x800→800x480, 180° rotation)")
 
                     pygame.display.update([pygame.Rect(0, 0, PHYSICAL_W, PHYSICAL_H)])
                 else:

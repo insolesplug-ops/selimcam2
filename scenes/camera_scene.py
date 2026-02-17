@@ -254,14 +254,19 @@ class CameraScene:
             if hasattr(self.app.camera, "get_preview_surface"):
                 preview_surface = self.app.camera.get_preview_surface()
             frame = self.app.camera.get_preview_frame()
+            logger.debug(f"[CameraScene] camera.get_preview_surface()={preview_surface is not None}, camera.get_preview_frame()={frame is not None if frame is not None else 'None'}")
+        else:
+            logger.error("[CameraScene] Camera backend NOT initialized!")
 
         if preview_surface is not None:
+            logger.debug(f"[CameraScene] Rendering preview_surface: {preview_surface.get_size()}")
             screen_w = self.app.config.get('display', 'width', default=480)
             screen_h = self.app.config.get('display', 'height', default=800)
             if preview_surface.get_size() != (screen_w, screen_h):
                 preview_surface = pygame.transform.scale(preview_surface, (screen_w, screen_h))
             screen.blit(preview_surface, (0, 0))
         elif frame is not None:
+            logger.debug(f"[CameraScene] Rendering numpy frame: shape={frame.shape}")
             filter_type_str = self.app.config.get('filter', 'active', default='none')
             filter_type = FilterType(filter_type_str)
             iso_value = self.app.config.get('filter', 'iso_fake', default=400)
@@ -273,10 +278,12 @@ class CameraScene:
             if surf:
                 screen.blit(surf, (0, 0))
             else:
+                logger.error("[CameraScene] _frame_to_surface() returned None!")
                 screen.fill((20, 20, 20))
                 self._render_error(screen, "Frame conversion failed")
         else:
             # No frame - show placeholder
+            logger.debug("[CameraScene] No frames available - showing blank screen")
             screen.fill((30, 30, 30))
             self._render_placeholder(screen)
         
