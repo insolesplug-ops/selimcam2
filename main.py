@@ -40,15 +40,15 @@ print("[Platform] Raspberry Pi 3A+ - FORCE MODE")
 # ============================================================
 # DISPLAY ROTATION CONSTANTS
 # ============================================================
-# KMS Hardware rotation: SDL_VIDEO_KMSDRM_ROTATION="2" (180 degrees)
-# - Logical app space: portrait (480x800), no software rotation
-# - Physical framebuffer: landscape (800x480), rotated 180 degrees by KMS
-# - Touch mapping: (480-x_raw, 800-y_raw) for 180 degree HW rotation
+# KMS Hardware rotation: SDL_VIDEO_KMSDRM_ROTATION="1" (90 degrees CW)
+# - Logical app space: portrait (480x800)
+# - Physical framebuffer: portrait (480x800) - native from KMS 90° rotation
+# - Touch mapping: (y_raw, width - x_raw) for 90 degree CW HW rotation
 
 LOGICAL_W  = 480
 LOGICAL_H  = 800
-PHYSICAL_W = 800
-PHYSICAL_H = 480
+PHYSICAL_W = 480
+PHYSICAL_H = 800
 
 # ============================================================
 # CORE IMPORTS
@@ -389,7 +389,7 @@ class CameraApp:
         self.logical_surface = pygame.Surface((LOGICAL_W, LOGICAL_H))
 
         pygame.display.set_caption("SelimCam v2.0")
-        logger.info(f"Display mode: logical {LOGICAL_W}x{LOGICAL_H} -> physical {PHYSICAL_W}x{PHYSICAL_H}")
+        logger.info(f"Display mode: {LOGICAL_W}x{LOGICAL_H} portrait (native via KMS 90° rotation)")
 
         self.clock = pygame.time.Clock()
         self.target_fps = self.config.get('camera', 'preview_fps', default=24)
@@ -457,9 +457,9 @@ class CameraApp:
             pass
 
     def _rotate_touch(self, px: int, py: int) -> tuple:
-        """180 degree flip: x_mapped = 480 - x_raw, y_mapped = 800 - y_raw"""
-        lx = max(0, min(479, int(480 - px)))
-        ly = max(0, min(799, int(800 - py)))
+        """90 degree CW rotation: x_mapped = y_raw, y_mapped = 800 - x_raw"""
+        lx = max(0, min(479, int(py)))
+        ly = max(0, min(799, int(800 - px)))
         return (lx, ly)
 
     def _init_hardware_safe(self) -> dict:
@@ -795,11 +795,9 @@ class CameraApp:
                     # Logger overlay auf logical_surface
                     logger.render_ui(self.logical_surface)
 
-                    # Scale logical 480x800 to physical 800x480, then rotate 180° for upside-down
-                    scaled = pygame.transform.scale(self.logical_surface, (PHYSICAL_W, PHYSICAL_H))
-                    rotated = pygame.transform.rotate(scaled, 180)
-                    self.screen.blit(rotated, (0, 0))
-                    logger.debug(f"[RENDER] Display updated (480x800→800x480, 180° rotation)")
+                    # Direct blit: logical 480x800 renders natively to physical 480x800 (KMS 90° rotation)
+                    self.screen.blit(self.logical_surface, (0, 0))
+                    logger.debug(f"[RENDER] Display updated (480x800, native portrait mode)")
 
                     pygame.display.update([pygame.Rect(0, 0, PHYSICAL_W, PHYSICAL_H)])
                 else:

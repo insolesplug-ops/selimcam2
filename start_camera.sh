@@ -8,8 +8,8 @@ cd "$SCRIPT_DIR" || exit 1
 export PYTHONUNBUFFERED=1
 export SELIMCAM_QUIET=true
 export SDL_VIDEODRIVER="kmsdrm"
-export SDL_VIDEO_KMSDRM_ROTATION="2"
-export SDL_FBDEV_ROTATION="2"
+export SDL_VIDEO_KMSDRM_ROTATION="1"
+export SDL_FBDEV_ROTATION="1"
 
 if [[ -f ".venv/bin/activate" ]]; then
 	# shellcheck disable=SC1091
