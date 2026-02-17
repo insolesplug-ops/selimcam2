@@ -308,6 +308,12 @@ class CameraScene:
             tilt = self.app.sensor_thread.get_tilt() if hasattr(self.app, 'sensor_thread') else 0.0
             self.app.grid_overlay.render_level(screen, tilt)
         
+        # ROTATION MODE INDICATOR (bottom-left corner, white text)
+        rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
+        mode_text = f"ROTATION: {rotation_mode}"
+        mode_surf = self.font_regular.render(mode_text, True, (255, 255, 255))
+        screen.blit(mode_surf, (10, 760))  # Bottom-left, 30px from bottom
+        
         # Top info bar (optional debug info) - render BEFORE overlay so overlay can cover it
         info_mode = self.app.config.get('ui', 'info_display', default='minimal')
         if info_mode != 'off':
@@ -382,15 +388,17 @@ class CameraScene:
     def _frame_to_surface(self, frame: np.ndarray) -> Optional[pygame.Surface]:
         """Convert numpy frame to portrait preview surface (top 480x640 area).
 
-        Requested behavior:
-        - Rotate 90° CW for portrait
-        - Apply additional 180° flip when image is upside down
-        - Fill the top preview area completely (480x640)
+        Rotation modes (without additional 180° flip):
+        - Mode 0: 90° CW only
+        - Mode 1: No rotation (native landscape as-is)
+        - Mode 2: 90° CCW only
+        - Mode 3: 180° only
         """
         try:
             preview_w, preview_h = 480, 640
 
-            rotation_mode = 0
+            # READ FROM CONFIG (NOT HARDCODED)
+            rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
 
             if self._debug_frame_logs:
                 logger.debug(f"[FRAME] Input: {frame.shape} | Rotation mode: {rotation_mode}")
@@ -414,8 +422,7 @@ class CameraScene:
                 if self._debug_frame_logs:
                     logger.debug(f"[FRAME] Mode 3: 180° → {oriented.get_size()}")
 
-            # Additional 180° flip (requested quick-fix for upside-down image)
-            oriented = pygame.transform.rotate(oriented, 180)
+            # NO ADDITIONAL 180° FLIP - each mode is self-contained
 
             # Aspect-preserving cover scale into preview area 480x640
             src_w, src_h = oriented.get_size()
