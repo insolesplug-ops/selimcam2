@@ -51,8 +51,8 @@ Group=${CURRENT_GROUP}
 WorkingDirectory=${PROJECT_DIR}
 Environment=PYTHONUNBUFFERED=1
 Environment=SDL_VIDEODRIVER=kmsdrm
-Environment=SDL_VIDEO_KMSDRM_ROTATION=270
-Environment=SDL_FBDEV_ROTATION=270
+Environment=SDL_VIDEO_KMSDRM_ROTATION=0
+Environment=SDL_FBDEV_ROTATION=0
 ExecStart=/bin/bash ${PROJECT_DIR}/start_camera.sh
 Restart=always
 RestartSec=5

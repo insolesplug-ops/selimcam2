@@ -40,13 +40,15 @@ print("[Platform] Raspberry Pi 3A+ - FORCE MODE")
 # ============================================================
 # DISPLAY ROTATION CONSTANTS
 # ============================================================
-# App läuft nativ im Portrait-Framebuffer.
-# Rotation wird auf KMS-Ebene (cmdline/env) gesteuert, nicht in Python.
+# Global software rotation:
+# - Logical app space stays portrait (480x800)
+# - Physical framebuffer is landscape (800x480)
+# - Final blit rotates logical surface 90° clockwise
 
-LOGICAL_W  = 480   # App-Breite (Portrait)
-LOGICAL_H  = 800   # App-Höhe   (Portrait)
-PHYSICAL_W = LOGICAL_W
-PHYSICAL_H = LOGICAL_H
+LOGICAL_W  = 480
+LOGICAL_H  = 800
+PHYSICAL_W = 800
+PHYSICAL_H = 480
 
 # ============================================================
 # CORE IMPORTS
@@ -361,8 +363,8 @@ class CameraApp:
         logger.info("=" * 70)
         logger.info(" SelimCam v2.0 - PRODUCTION BUILD")
         logger.info(" Platform: Raspberry Pi 3A+")
-        logger.info(f" Display: Portrait framebuffer {LOGICAL_W}x{LOGICAL_H}")
-        logger.info(" Rotation is expected from KMS/cmdline/environment, not software rotation")
+        logger.info(f" Display: logical {LOGICAL_W}x{LOGICAL_H}, physical {PHYSICAL_W}x{PHYSICAL_H}")
+        logger.info(" Rotation: software 90 degrees clockwise")
         logger.info("=" * 70)
 
         self.perf_monitor = PerformanceMonitor()
@@ -378,16 +380,16 @@ class CameraApp:
         ])
         self.config = ConfigManager()
 
-        # Natives Portrait-Fenster (KMS-Rotation außerhalb der App)
+        # Physical framebuffer (landscape)
         flags = pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.FULLSCREEN
-        self.screen = pygame.display.set_mode((LOGICAL_W, LOGICAL_H), flags)
+        self.screen = pygame.display.set_mode((PHYSICAL_W, PHYSICAL_H), flags)
 
         # Logische Surface PORTRAIT (so wie App denkt)
         # Alle Scenes rendern NUR auf diese Surface!
         self.logical_surface = pygame.Surface((LOGICAL_W, LOGICAL_H))
 
         pygame.display.set_caption("SelimCam v2.0")
-        logger.info(f"Display mode: {LOGICAL_W}x{LOGICAL_H} (portrait)")
+        logger.info(f"Display mode: logical {LOGICAL_W}x{LOGICAL_H} -> physical {PHYSICAL_W}x{PHYSICAL_H}")
 
         self.clock = pygame.time.Clock()
         self.target_fps = self.config.get('camera', 'preview_fps', default=24)
@@ -451,11 +453,13 @@ class CameraApp:
     # ── TOUCH KOORDINATEN (PORTRAIT) ────────────────────────────────
     def _rotate_touch(self, px: int, py: int) -> tuple:
         """
-        Native Portrait-Koordinaten -> Logische App-Koordinaten.
-        KMS/DRM übernimmt Display-Rotation, daher keine Software-Rotation.
+        Physical landscape touch -> logical portrait coordinates.
+        For clockwise render rotation use:
+          new_x = y
+          new_y = width - x
         """
-        lx = int(px)
-        ly = int(py)
+        lx = int(py)
+        ly = int(PHYSICAL_W - px)
         # Clamp
         lx = max(0, min(LOGICAL_W - 1, lx))
         ly = max(0, min(LOGICAL_H - 1, ly))
@@ -714,6 +718,15 @@ class CameraApp:
                         self.power_manager.update_activity()
                         px, py = event.pos
                         lx, ly = self._rotate_touch(px, py)
+                        rotated_event = pygame.event.Event(
+                            pygame.MOUSEBUTTONDOWN,
+                            {
+                                "pos": (lx, ly),
+                                "button": getattr(event, "button", 1),
+                                "touch": getattr(event, "touch", False),
+                                "window": getattr(event, "window", None),
+                            },
+                        )
                         scene_name = self.state_machine.current_state.value
                         result = self.hitbox_engine.hit_test(scene_name, lx, ly)
                         if result:
@@ -723,13 +736,13 @@ class CameraApp:
                         else:
                             scene = self.scenes.get(self.state_machine.current_state)
                             if scene:
-                                scene.handle_event(event)
+                                scene.handle_event(rotated_event)
 
                     # Finger Touch (direktes KMS/DRM Touch Event)
                     elif event.type == pygame.FINGERDOWN:
                         self.power_manager.update_activity()
-                        px = int(event.x * LOGICAL_W)
-                        py = int(event.y * LOGICAL_H)
+                        px = int(event.x * PHYSICAL_W)
+                        py = int(event.y * PHYSICAL_H)
                         lx, ly = self._rotate_touch(px, py)
                         scene_name = self.state_machine.current_state.value
                         result = self.hitbox_engine.hit_test(scene_name, lx, ly)
@@ -768,7 +781,8 @@ class CameraApp:
                     # Logger overlay auf logical_surface
                     logger.render_ui(self.logical_surface)
 
-                    self.screen.blit(self.logical_surface, (0, 0))
+                    rotated = pygame.transform.rotate(self.logical_surface, -90)
+                    self.screen.blit(rotated, (0, 0))
 
                     pygame.display.flip()
                 else:

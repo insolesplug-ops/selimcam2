@@ -8,6 +8,7 @@ import sys
 import logging
 import numpy as np
 import threading
+import pygame
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -67,6 +68,9 @@ class CameraBackend:
         self.is_running   = False
         self._frame_lock  = threading.Lock()
         self._last_frame: Optional[np.ndarray] = None
+        self._last_surface: Optional[pygame.Surface] = None
+        self._capture_thread: Optional[threading.Thread] = None
+        self._capture_stop = threading.Event()
         self._Picamera2   = Picamera2
 
         self.camera = Picamera2()
@@ -77,11 +81,37 @@ class CameraBackend:
     def _configure_preview(self):
         cfg = self.camera.create_preview_configuration(
             main={"size": self.preview_size, "format": "RGB888"},
-            buffer_count=2,
-            queue=False,
+            lores={"size": self.preview_size, "format": "YUV420"},
+            buffer_count=3,
+            queue=True,
             controls={"FrameRate": float(self.preview_fps)}
         )
         self.camera.configure(cfg)
+
+    def _capture_loop(self):
+        while not self._capture_stop.is_set():
+            try:
+                request = self.camera.capture_request()
+                frame = request.make_array("main")
+                request.release()
+                if frame is None:
+                    continue
+
+                if frame.ndim == 3 and frame.shape[2] >= 3:
+                    frame_rgb = frame[:, :, :3]
+                else:
+                    frame_rgb = frame
+
+                frame_contiguous = np.ascontiguousarray(frame_rgb)
+                h, w = frame_contiguous.shape[:2]
+                surface = pygame.image.frombuffer(frame_contiguous.data, (w, h), "RGB").copy()
+
+                with self._frame_lock:
+                    self._last_frame = frame_contiguous
+                    self._last_surface = surface
+            except Exception as exc:
+                logger.debug("Camera request loop error: %s", exc)
+                time.sleep(0.01)
 
     def _configure_capture(self):
         cfg = self.camera.create_still_configuration(
@@ -93,7 +123,10 @@ class CameraBackend:
         if self.is_running:
             return
         try:
-            self.camera.start()
+            self.camera.start(show_preview=False)
+            self._capture_stop.clear()
+            self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
+            self._capture_thread.start()
             self.is_running = True
             time.sleep(0.15)
             logger.info("Camera preview started")
@@ -105,6 +138,10 @@ class CameraBackend:
         if not self.is_running:
             return
         try:
+            self._capture_stop.set()
+            if self._capture_thread is not None:
+                self._capture_thread.join(timeout=0.5)
+                self._capture_thread = None
             self.camera.stop()
         except Exception:
             pass
@@ -113,18 +150,22 @@ class CameraBackend:
     def get_preview_frame(self) -> Optional[np.ndarray]:
         if not self.is_running:
             return None
-        try:
-            frame = self.camera.capture_array("main")
-            with self._frame_lock:
-                self._last_frame = frame
-            return frame
-        except Exception:
+        with self._frame_lock:
+            return self._last_frame.copy() if self._last_frame is not None else None
+
+    def get_preview_surface(self) -> Optional[pygame.Surface]:
+        if not self.is_running:
             return None
+        with self._frame_lock:
+            return self._last_surface
 
     def capture_array(self) -> Optional[np.ndarray]:
         if not self.is_running:
             return None
         try:
+            with self._frame_lock:
+                if self._last_frame is not None:
+                    return self._last_frame.copy()
             return self.camera.capture_array("main").copy()
         except Exception as e:
             logger.error("Camera capture_array failed: %s", e)

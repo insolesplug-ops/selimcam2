@@ -249,24 +249,28 @@ class CameraScene:
             return
         
         # Get preview frame
+        preview_surface = None
         frame = None
         if self.app.camera:
+            if hasattr(self.app.camera, "get_preview_surface"):
+                preview_surface = self.app.camera.get_preview_surface()
             frame = self.app.camera.get_preview_frame()
-        
-        if frame is not None:
-            # Apply filter
+
+        if preview_surface is not None:
+            screen_w = self.app.config.get('display', 'width', default=480)
+            screen_h = self.app.config.get('display', 'height', default=800)
+            if preview_surface.get_size() != (screen_w, screen_h):
+                preview_surface = pygame.transform.scale(preview_surface, (screen_w, screen_h))
+            screen.blit(preview_surface, (0, 0))
+        elif frame is not None:
             filter_type_str = self.app.config.get('filter', 'active', default='none')
             filter_type = FilterType(filter_type_str)
             iso_value = self.app.config.get('filter', 'iso_fake', default=400)
-            
+
             filtered_frame = self.filter_engine.process_frame(frame, filter_type, iso_value)
-            
-            # Apply zoom
             zoomed_frame = self._apply_zoom(filtered_frame)
-            
-            # Convert to pygame surface
             surf = self._frame_to_surface(zoomed_frame)
-            
+
             if surf:
                 screen.blit(surf, (0, 0))
             else:
