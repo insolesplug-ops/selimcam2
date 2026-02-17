@@ -3,25 +3,25 @@
   "hitboxes": [
     {
       "name": "settings",
-      "x": 20,
+      "x": 10,
       "y": 730,
-      "width": 80,
+      "width": 60,
       "height": 60,
       "action": "open_settings"
     },
     {
       "name": "flash",
-      "x": 200,
+      "x": 210,
       "y": 730,
-      "width": 80,
+      "width": 60,
       "height": 60,
       "action": "cycle_flash"
     },
     {
       "name": "gallery",
-      "x": 380,
+      "x": 410,
       "y": 730,
-      "width": 80,
+      "width": 60,
       "height": 60,
       "action": "open_gallery"
     }

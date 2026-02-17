@@ -68,7 +68,7 @@ class CameraScene:
         
         # Auto-rotation test mode (cycles every 10 seconds)
         self.rotation_test_timer = 0.0
-        self.rotation_test_auto_cycle = True  # Re-enabled for architecture change testing
+        self.rotation_test_auto_cycle = False  # DISABLED - Mode 0 is correct with new +90° architecture
         
         logger.info("[CameraScene] Initialized")
     
@@ -356,6 +356,9 @@ class CameraScene:
         if self.fps > 0:
             fps_surf = self.font_regular.render(f"{self.fps} FPS", True, (0, 255, 0))
             screen.blit(fps_surf, (10, 40))
+        
+        # UI BUTTONS OVERLAY (Settings, Gallery, Flash)
+        self._render_ui_buttons(screen)
     
     def _render_placeholder(self, screen: pygame.Surface):
         """Render 'No Camera' placeholder."""
@@ -404,7 +407,7 @@ class CameraScene:
         return frame[y1:y2, x1:x2]
     
     def _frame_to_surface(self, frame: np.ndarray) -> Optional[pygame.Surface]:
-        """Convert numpy frame to portrait preview surface (top 480x640 area).
+        """Convert numpy frame to portrait preview surface (FULL 480x800 screen).
 
         Rotation modes (without additional 180° flip):
         - Mode 0: 90° CW only
@@ -413,7 +416,7 @@ class CameraScene:
         - Mode 3: 180° only
         """
         try:
-            preview_w, preview_h = 480, 640
+            preview_w, preview_h = 480, 800
 
             # READ FROM CONFIG (NOT HARDCODED)
             rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
@@ -490,3 +493,35 @@ class CameraScene:
                 screen, battery_pct, datetime_str,
                 lux, self.zoom_current, filter_name, photo_count
             )
+    
+    def _render_ui_buttons(self, screen: pygame.Surface):
+        """Render UI buttons at bottom: Settings (left), Flash (center), Gallery (right)."""
+        button_size = 60
+        icon_padding = 10
+        bottom_y = 800 - button_size - icon_padding
+        
+        # SETTINGS - Bottom-left
+        if self.settings_icon:
+            try:
+                scaled_settings = pygame.transform.scale(self.settings_icon, (button_size, button_size))
+                screen.blit(scaled_settings, (icon_padding, bottom_y))
+            except Exception as e:
+                logger.debug(f"[UI] Settings icon error: {e}")
+        
+        # FLASH MODE - Bottom-center
+        flash_mode = self.app.config.get('flash', 'mode', default='off')
+        flash_overlay = self.flash_overlays.get(flash_mode)
+        if flash_overlay:
+            try:
+                scaled_flash = pygame.transform.scale(flash_overlay, (button_size, button_size))
+                screen.blit(scaled_flash, (210, bottom_y))
+            except Exception as e:
+                logger.debug(f"[UI] Flash overlay error: {e}")
+        
+        # GALLERY - Bottom-right
+        if self.gallery_icon:
+            try:
+                scaled_gallery = pygame.transform.scale(self.gallery_icon, (button_size, button_size))
+                screen.blit(scaled_gallery, (480 - button_size - icon_padding, bottom_y))
+            except Exception as e:
+                logger.debug(f"[UI] Gallery icon error: {e}")

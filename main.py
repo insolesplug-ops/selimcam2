@@ -465,11 +465,11 @@ class CameraApp:
     def _rotate_touch(self, px: int, py: int) -> tuple:
         """Transform touch from physical 800x480 to logical 480x800.
         
-        The logical surface (480x800) is rotated -90° (90° CW) to fit the physical
+        The logical surface (480x800) is rotated +90° (90° CCW) to fit the physical
         800x480 display. We need to apply the inverse transformation.
         
-        When rotating -90° (CW): (x, y) → (height - y, x)
-        Inverse: (px, py) from rotated space → (py, 800 - px) in original space
+        When rotating +90° (CCW): (x, y) → (height - y, x) in the rotated space
+        Inverse: (px, py) from rotated 800x480 space → (py, 800 - px) in original 480x800 space
         """
         lx = int(py)
         ly = int(800 - px)
@@ -824,8 +824,8 @@ class CameraApp:
                             pygame.draw.circle(self.logical_surface, (255, 0, 0), self.last_touch_point, 10)
                             pygame.draw.circle(self.logical_surface, (255, 255, 255), self.last_touch_point, 12, 2)
 
-                    # ROTATE VIRTUAL SURFACE 90° CW FOR PHYSICAL 800x480 DISPLAY
-                    rotated_surface = pygame.transform.rotate(self.logical_surface, -90)
+                    # ROTATE VIRTUAL SURFACE 90° CCW (270° CW) FOR PHYSICAL 800x480 DISPLAY
+                    rotated_surface = pygame.transform.rotate(self.logical_surface, 90)
                     
                     # BLIT ROTATED SURFACE TO PHYSICAL 800x480 SCREEN
                     self.screen.blit(rotated_surface, (0, 0))
