@@ -2,6 +2,9 @@
 SelimCam v2.0 - PRODUCTION BUILD
 Pi 3A+ | 8MP Camera | Waveshare 4.3" DSI
 FIXES: KMS Hardware Rotation 180deg, Touch Mapping, Debug Logging
+"""
+
+import os
 import sys
 import pygame
 import time
