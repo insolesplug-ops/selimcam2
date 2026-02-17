@@ -122,15 +122,21 @@ class CameraBackend:
         if self.is_running:
             return
         try:
+            # MUST configure before starting
+            logger.info("Configuring camera preview...")
+            self._configure_preview()
+            
+            logger.info("Starting camera...")
             self.camera.start(show_preview=False)
             self._capture_stop.clear()
             self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
             self._capture_thread.start()
             self.is_running = True
-            time.sleep(0.15)
+            time.sleep(0.3)
             logger.info("Camera preview started")
         except Exception as e:
             logger.error("Camera preview start failed: %s", e)
+            self.is_running = False
             raise
 
     def stop_preview(self):
