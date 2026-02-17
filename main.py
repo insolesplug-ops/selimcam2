@@ -51,8 +51,8 @@ print("[Platform] Raspberry Pi 3A+ - FORCE MODE")
 
 LOGICAL_W  = 480
 LOGICAL_H  = 800
-PHYSICAL_W = 480
-PHYSICAL_H = 800
+PHYSICAL_W = 800  # Hardware can ONLY do 800x480 (landscape native)
+PHYSICAL_H = 480  # We will rotate the virtual 480x800 surface to fit here
 
 # ============================================================
 # CORE IMPORTS
@@ -463,25 +463,16 @@ class CameraApp:
             pass
 
     def _rotate_touch(self, px: int, py: int) -> tuple:
-        """Transform touch input based on active rotation mode."""
-        rotation_mode = self.config.get('camera', 'rotation_test', default=0)
+        """Transform touch from physical 800x480 to logical 480x800.
         
-        if rotation_mode == 0:
-            # Mode 0: 90° CW
-            lx = int(py)
-            ly = int(480 - px)
-        elif rotation_mode == 1:
-            # Mode 1: No rotation (identity)
-            lx = int(px)
-            ly = int(py)
-        elif rotation_mode == 2:
-            # Mode 2: 90° CCW (THIS IS YOUR SETUP!)
-            lx = int(800 - py)
-            ly = int(px)
-        else:  # Mode 3
-            # Mode 3: 180° flip
-            lx = int(480 - px)
-            ly = int(800 - py)
+        The logical surface (480x800) is rotated -90° (90° CW) to fit the physical
+        800x480 display. We need to apply the inverse transformation.
+        
+        When rotating -90° (CW): (x, y) → (height - y, x)
+        Inverse: (px, py) from rotated space → (py, 800 - px) in original space
+        """
+        lx = int(py)
+        ly = int(800 - px)
 
         lx = max(0, min(LOGICAL_W - 1, lx))
         ly = max(0, min(LOGICAL_H - 1, ly))
@@ -817,6 +808,9 @@ class CameraApp:
 
                 # Render
                 if not self.power_manager.is_standby():
+                    # CLEAR LOGICAL SURFACE EVERY FRAME
+                    self.logical_surface.fill((0, 0, 0))
+                    
                     if scene:
                         # Scene rendert auf logical_surface (PORTRAIT 480x800)
                         scene.render(self.logical_surface)
@@ -830,8 +824,11 @@ class CameraApp:
                             pygame.draw.circle(self.logical_surface, (255, 0, 0), self.last_touch_point, 10)
                             pygame.draw.circle(self.logical_surface, (255, 255, 255), self.last_touch_point, 12, 2)
 
-                    # Direct blit: logical 480x800 renders natively to physical 480x800 (KMS 90° rotation)
-                    self.screen.blit(self.logical_surface, (0, 0))
+                    # ROTATE VIRTUAL SURFACE 90° CW FOR PHYSICAL 800x480 DISPLAY
+                    rotated_surface = pygame.transform.rotate(self.logical_surface, -90)
+                    
+                    # BLIT ROTATED SURFACE TO PHYSICAL 800x480 SCREEN
+                    self.screen.blit(rotated_surface, (0, 0))
 
                     pygame.display.update([pygame.Rect(0, 0, PHYSICAL_W, PHYSICAL_H)])
                 else:
