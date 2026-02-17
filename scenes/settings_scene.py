@@ -349,15 +349,5 @@ class SettingsScene:
             value_rect.centery = y + 20
             screen.blit(value_surf, value_rect)
         
-        # Bottom instructions - subtle gray
-        inst_text = "↑↓ Navigate  ←→ Change  ESC Back"
-        inst_surf = self.font_label.render(inst_text, True, (100, 100, 100))
-        inst_surf.set_alpha(200)
-        inst_rect = inst_surf.get_rect()
-        inst_rect.centerx = 240
-        inst_rect.bottom = 788
-        screen.blit(inst_surf, inst_rect)
-        
-        # Back button indicator (top-left)
-        back_surf = self.font_label.render("< BACK", True, (200, 200, 200))
-        screen.blit(back_surf, (20, 750))
+        # Back button + UI buttons handled by overlays (no text labels)
+        # Touch hitboxes handle navigation

@@ -322,19 +322,4 @@ class GalleryScene:
         bar_surf.fill((20, 20, 20))
         screen.blit(bar_surf, (0, 730))
         
-        # Back (left)
-        back_surf = self.font_info.render("< BACK", True, (200, 200, 200))
-        screen.blit(back_surf, (20, 750))
-        
-        # Delete (center) - only if photos exist
-        if self.photos:
-            delete_surf = self.font_info.render("DELETE (Del)", True, (255, 100, 100))
-            delete_rect = delete_surf.get_rect(center=(240, 765))
-            screen.blit(delete_surf, delete_rect)
-        
-        # Navigation hint (right)
-        nav_surf = self.font_info.render("← →", True, (200, 200, 200))
-        nav_rect = nav_surf.get_rect()
-        nav_rect.right = 460
-        nav_rect.top = 750
-        screen.blit(nav_surf, nav_rect)
+        # Back button + action buttons handled by hitboxes (no text labels)

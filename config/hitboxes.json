@@ -3,27 +3,35 @@
   "hitboxes": [
     {
       "name": "settings",
-      "x": 10,
-      "y": 730,
-      "width": 60,
-      "height": 60,
+      "x": 248,
+      "y": 735,
+      "width": 73,
+      "height": 48,
       "action": "open_settings"
     },
     {
       "name": "flash",
-      "x": 210,
-      "y": 730,
-      "width": 60,
-      "height": 60,
+      "x": 321,
+      "y": 735,
+      "width": 73,
+      "height": 48,
       "action": "cycle_flash"
     },
     {
       "name": "gallery",
-      "x": 410,
-      "y": 730,
-      "width": 60,
-      "height": 60,
+      "x": 387,
+      "y": 735,
+      "width": 73,
+      "height": 48,
       "action": "open_gallery"
+    },
+    {
+      "name": "back",
+      "x": 0,
+      "y": 706,
+      "width": 114,
+      "height": 97,
+      "action": "go_back"
     }
   ]
 }

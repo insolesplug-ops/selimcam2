@@ -465,14 +465,16 @@ class CameraApp:
     def _rotate_touch(self, px: int, py: int) -> tuple:
         """Transform touch from physical 800x480 to logical 480x800.
         
-        The logical surface (480x800) is rotated +90° (90° CCW) to fit the physical
-        800x480 display. We need to apply the inverse transformation.
+        Physical display is 800x480 (landscape).
+        Logical app is 480x800 (portrait).
         
-        When rotating +90° (CCW): (x, y) → (height - y, x) in the rotated space
-        Inverse: (px, py) from rotated 800x480 space → (py, 800 - px) in original 480x800 space
+        We rotate logical +90° CCW to get physical display.
+        Inverse transform: physical (px, py) → logical (lx, ly)
+        
+        For +90° CCW rotation: (x, y) → (height - y, x)
         """
-        lx = int(py)
-        ly = int(800 - px)
+        lx = int(800 - py)
+        ly = int(px)
 
         lx = max(0, min(LOGICAL_W - 1, lx))
         ly = max(0, min(LOGICAL_H - 1, ly))

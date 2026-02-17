@@ -91,17 +91,6 @@ class CameraScene:
         
         self.app.power_manager.update_activity()
         
-        if event.type == pygame.KEYDOWN:
-            # Keyboard shortcuts
-            if event.key == pygame.K_s:
-                self._capture_photo()
-            elif event.key == pygame.K_g:
-                self._toggle_grid()
-            elif event.key == pygame.K_l:
-                self._toggle_level()
-            elif event.key == pygame.K_f:
-                self._cycle_flash_mode()
-        
         elif event.type == pygame.MOUSEBUTTONDOWN:
             mx, my = event.pos
             
@@ -495,33 +484,29 @@ class CameraScene:
             )
     
     def _render_ui_buttons(self, screen: pygame.Surface):
-        """Render UI buttons at bottom: Settings (left), Flash (center), Gallery (right)."""
-        button_size = 60
-        icon_padding = 10
-        bottom_y = 800 - button_size - icon_padding
-        
-        # SETTINGS - Bottom-left
+        """Render UI buttons using actual PNG coordinates from hitboxes."""
+        # SETTINGS - (248, 735) 73x48
         if self.settings_icon:
             try:
-                scaled_settings = pygame.transform.scale(self.settings_icon, (button_size, button_size))
-                screen.blit(scaled_settings, (icon_padding, bottom_y))
+                scaled_settings = pygame.transform.scale(self.settings_icon, (73, 48))
+                screen.blit(scaled_settings, (248, 735))
             except Exception as e:
                 logger.debug(f"[UI] Settings icon error: {e}")
         
-        # FLASH MODE - Bottom-center
+        # FLASH - (321, 735) 73x48
         flash_mode = self.app.config.get('flash', 'mode', default='off')
         flash_overlay = self.flash_overlays.get(flash_mode)
         if flash_overlay:
             try:
-                scaled_flash = pygame.transform.scale(flash_overlay, (button_size, button_size))
-                screen.blit(scaled_flash, (210, bottom_y))
+                scaled_flash = pygame.transform.scale(flash_overlay, (73, 48))
+                screen.blit(scaled_flash, (321, 735))
             except Exception as e:
                 logger.debug(f"[UI] Flash overlay error: {e}")
         
-        # GALLERY - Bottom-right
+        # GALLERY - (387, 735) 73x48
         if self.gallery_icon:
             try:
-                scaled_gallery = pygame.transform.scale(self.gallery_icon, (button_size, button_size))
-                screen.blit(scaled_gallery, (480 - button_size - icon_padding, bottom_y))
+                scaled_gallery = pygame.transform.scale(self.gallery_icon, (73, 48))
+                screen.blit(scaled_gallery, (387, 735))
             except Exception as e:
                 logger.debug(f"[UI] Gallery icon error: {e}")
