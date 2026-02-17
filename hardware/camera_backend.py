@@ -90,10 +90,22 @@ class CameraBackend:
     def _capture_loop(self):
         while not self._capture_stop.is_set():
             try:
+                if self.camera is None:
+                    logger.error("Camera is None in capture loop!")
+                    time.sleep(0.1)
+                    continue
+                    
                 request = self.camera.capture_request()
+                if request is None:
+                    logger.warning("capture_request() returned None")
+                    time.sleep(0.01)
+                    continue
+                    
                 frame = request.make_array("main")
                 request.release()
+                
                 if frame is None:
+                    logger.warning("make_array() returned None")
                     continue
 
                 if frame.ndim == 3 and frame.shape[2] >= 3:
@@ -108,9 +120,11 @@ class CameraBackend:
                 self._capture_error_count = 0
             except Exception as exc:
                 self._capture_error_count += 1
-                if self._capture_error_count <= 5 or self._capture_error_count % 30 == 0:
+                if self._capture_error_count == 1 or self._capture_error_count % 30 == 0:
                     logger.error("Camera request loop error (%d): %s", self._capture_error_count, exc)
-                time.sleep(0.01)
+                    import traceback
+                    logger.error(traceback.format_exc())
+                time.sleep(0.05)
 
     def _configure_capture(self):
         cfg = self.camera.create_still_configuration(
