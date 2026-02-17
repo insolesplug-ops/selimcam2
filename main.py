@@ -6,7 +6,6 @@ FIXES: Software Rotation 90°, Standby 10s, No Stubs
 
 import os
 import sys
-import platform
 import pygame
 import time
 import signal
@@ -28,18 +27,18 @@ except ImportError:
 
 # FORCE PI MODE - Pi 3A+ hardcoded
 IS_RASPBERRY_PI = True
-print("[Platform] 🍓 Raspberry Pi 3A+ - FORCE MODE")
+print("[Platform] Raspberry Pi 3A+ - FORCE MODE")
 
 # ============================================================
 # DISPLAY ROTATION CONSTANTS
 # ============================================================
-# Display ist physisch Landscape (800x480)
-# App rendert Portrait (480x800) und wird SOFTWARE-rotiert 90° rechts
+# App läuft nativ im Portrait-Framebuffer.
+# Rotation wird auf KMS-Ebene (cmdline/env) gesteuert, nicht in Python.
 
-PHYSICAL_W = 800   # Physisches Display: Breite
-PHYSICAL_H = 480   # Physisches Display: Höhe
-LOGICAL_W  = 480   # Logische App-Breite  (Portrait)
-LOGICAL_H  = 800   # Logische App-Höhe    (Portrait)
+LOGICAL_W  = 480   # App-Breite (Portrait)
+LOGICAL_H  = 800   # App-Höhe   (Portrait)
+PHYSICAL_W = LOGICAL_W
+PHYSICAL_H = LOGICAL_H
 
 # ============================================================
 # CORE IMPORTS
@@ -116,56 +115,55 @@ from scenes.settings_scene import SettingsScene
 from scenes.gallery_scene import GalleryScene
 
 # ============================================================
-# HARDWARE IMPORTS - SIMULATORS FIRST, DANN ECHTE HARDWARE
+# HARDWARE IMPORTS - REAL HARDWARE ONLY (PI MODE)
 # ============================================================
 
-from hardware.simulator import (
-    CameraSimulator, EncoderSimulator, ButtonSimulator,
-    HapticSimulator, LightSensorSimulator, GyroscopeSimulator,
-    FlashLEDSimulator, BatterySimulator, BrightnessSimulator
-)
+HARDWARE_IMPORT_ERRORS = {}
 
-# Echte Hardware laden - IS_RASPBERRY_PI bleibt IMMER True!
-try:
-    from hardware.camera_backend import CameraBackend as RealCamera
-    from hardware.encoder import RotaryEncoder as RealEncoder
-    from hardware.buttons import DebouncedButton as RealButton
-    from hardware.haptic import HapticDriver as RealHaptic
-    from hardware.light_sensor import LightSensor as RealLightSensor
-    from hardware.gyro import Gyroscope as RealGyro
-    from hardware.flash_led import FlashLED as RealFlashLED
-    from hardware.battery import BatteryMonitor as RealBattery
-    from hardware.brightness import BrightnessController as RealBrightness
-    logger.info("✓ Real hardware backends loaded")
-    HARDWARE_IMPORTED = True
-except Exception as e:
-    logger.error(f"Hardware import failed: {e}")
-    logger.warning("Using simulators - IS_RASPBERRY_PI stays True!")
-    HARDWARE_IMPORTED = False
-    # WICHTIG: IS_RASPBERRY_PI = False ist VERBOTEN hier!
 
-# Backends zuweisen
+def _load_hardware_backend(component: str, module_path: str, class_name: str):
+    try:
+        module = __import__(module_path, fromlist=[class_name])
+        backend_cls = getattr(module, class_name)
+        logger.info(f"Hardware backend loaded: {component} -> {module_path}.{class_name}")
+        return backend_cls
+    except Exception as exc:
+        HARDWARE_IMPORT_ERRORS[component] = f"{type(exc).__name__}: {exc}"
+        logger.error(f"Hardware backend import failed [{component}] {module_path}.{class_name}: {exc}")
+        return None
+
+
+CameraBackend = _load_hardware_backend("camera", "hardware.camera_backend", "CameraBackend")
+RotaryEncoder = _load_hardware_backend("encoder", "hardware.encoder", "RotaryEncoder")
+DebouncedButton = _load_hardware_backend("buttons", "hardware.buttons", "DebouncedButton")
+HapticDriver = _load_hardware_backend("haptic", "hardware.haptic", "HapticDriver")
+LightSensor = _load_hardware_backend("light_sensor", "hardware.light_sensor", "LightSensor")
+Gyroscope = _load_hardware_backend("gyro", "hardware.gyro", "Gyroscope")
+FlashLED = _load_hardware_backend("flash_led", "hardware.flash_led", "FlashLED")
+BatteryMonitor = _load_hardware_backend("battery", "hardware.battery", "BatteryMonitor")
+BrightnessController = _load_hardware_backend("brightness", "hardware.brightness", "BrightnessController")
+
+HARDWARE_IMPORTED = len(HARDWARE_IMPORT_ERRORS) == 0
 if HARDWARE_IMPORTED:
-    CameraBackend = RealCamera
-    RotaryEncoder = RealEncoder
-    DebouncedButton = RealButton
-    HapticDriver = RealHaptic
-    LightSensor = RealLightSensor
-    Gyroscope = RealGyro
-    FlashLED = RealFlashLED
-    BatteryMonitor = RealBattery
-    BrightnessController = RealBrightness
+    logger.info("All real hardware backends loaded")
 else:
-    CameraBackend = CameraSimulator
-    RotaryEncoder = EncoderSimulator
-    DebouncedButton = ButtonSimulator
-    HapticDriver = HapticSimulator
-    LightSensor = LightSensorSimulator
-    Gyroscope = GyroscopeSimulator
-    FlashLED = FlashLEDSimulator
-    BatteryMonitor = BatterySimulator
-    BrightnessController = BrightnessSimulator
-    logger.info("Simulator backends active")
+    logger.warning(f"Hardware import issues detected ({len(HARDWARE_IMPORT_ERRORS)} components)")
+
+
+class _NoopBrightnessController:
+    def __init__(self):
+        self.available = False
+        self._brightness = 120
+
+    def set_brightness(self, value: int) -> bool:
+        self._brightness = max(0, min(255, int(value)))
+        return False
+
+    def get_brightness(self) -> int:
+        return self._brightness
+
+    def cleanup(self):
+        return
 
 
 # ============================================================
@@ -257,7 +255,7 @@ class PowerManager:
     def enter_standby(self):
         if self.state == self.STATE_STANDBY:
             return
-        logger.info("📴 STANDBY")
+        logger.info("STANDBY")
         self.active_brightness = self.brightness_ctrl.get_brightness()
         self.brightness_ctrl.set_brightness(0)
         self.state = self.STATE_STANDBY
@@ -265,7 +263,7 @@ class PowerManager:
     def wake_from_standby(self):
         if self.state != self.STATE_STANDBY:
             return
-        logger.info("🔋 WAKE")
+        logger.info("WAKE")
         self.brightness_ctrl.set_brightness(self.active_brightness or 120)
         self.state = self.STATE_ACTIVE
         self.last_activity_time = time.time()
@@ -355,8 +353,8 @@ class CameraApp:
         logger.info("=" * 70)
         logger.info(" SelimCam v2.0 - PRODUCTION BUILD")
         logger.info(" Platform: Raspberry Pi 3A+")
-        logger.info(f" Display:  SOFTWARE ROTATION 90° right")
-        logger.info(f"           Physical {PHYSICAL_W}x{PHYSICAL_H} → Logical {LOGICAL_W}x{LOGICAL_H}")
+        logger.info(f" Display: Portrait framebuffer {LOGICAL_W}x{LOGICAL_H}")
+        logger.info(" Rotation is expected from KMS/cmdline/environment, not software rotation")
         logger.info("=" * 70)
 
         self.perf_monitor = PerformanceMonitor()
@@ -364,16 +362,16 @@ class CameraApp:
         pygame.mouse.set_visible(False)
         self.config = ConfigManager()
 
-        # Physisches Fenster LANDSCAPE (so wie Hardware)
+        # Natives Portrait-Fenster (KMS-Rotation außerhalb der App)
         flags = pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.FULLSCREEN
-        self.screen = pygame.display.set_mode((PHYSICAL_W, PHYSICAL_H), flags)
+        self.screen = pygame.display.set_mode((LOGICAL_W, LOGICAL_H), flags)
 
         # Logische Surface PORTRAIT (so wie App denkt)
         # Alle Scenes rendern NUR auf diese Surface!
         self.logical_surface = pygame.Surface((LOGICAL_W, LOGICAL_H))
 
         pygame.display.set_caption("SelimCam v2.0")
-        logger.info(f"Physical: {PHYSICAL_W}x{PHYSICAL_H} | Logical: {LOGICAL_W}x{LOGICAL_H}")
+        logger.info(f"Display mode: {LOGICAL_W}x{LOGICAL_H} (portrait)")
 
         self.clock = pygame.time.Clock()
         self.target_fps = self.config.get('camera', 'preview_fps', default=24)
@@ -407,16 +405,14 @@ class CameraApp:
         if mem > 0:
             logger.info(f"Memory: {mem:.1f}MB")
 
-    # ── TOUCH KOORDINATEN UMRECHNEN ─────────────────────────────────
+    # ── TOUCH KOORDINATEN (PORTRAIT) ────────────────────────────────
     def _rotate_touch(self, px: int, py: int) -> tuple:
         """
-        Physische Landscape-Koordinaten → Logische Portrait-Koordinaten.
-        Rotation 90° nach rechts (clockwise):
-          lx = PHYSICAL_H - 1 - py  (skaliert)
-          ly = px                    (skaliert)
+        Native Portrait-Koordinaten -> Logische App-Koordinaten.
+        KMS/DRM übernimmt Display-Rotation, daher keine Software-Rotation.
         """
-        lx = int((PHYSICAL_H - 1 - py) * LOGICAL_W / PHYSICAL_H)
-        ly = int(px * LOGICAL_H / PHYSICAL_W)
+        lx = int(px)
+        ly = int(py)
         # Clamp
         lx = max(0, min(LOGICAL_W - 1, lx))
         ly = max(0, min(LOGICAL_H - 1, ly))
@@ -428,33 +424,56 @@ class CameraApp:
         av = {}
 
         try:
+            if CameraBackend is None:
+                import_error = HARDWARE_IMPORT_ERRORS.get('camera', 'unknown import error')
+                raise RuntimeError(f"Camera backend unavailable: {import_error}")
+
             pw  = self.config.get('camera', 'preview_width',  default=640)
             ph  = self.config.get('camera', 'preview_height', default=480)
             cw  = self.config.get('camera', 'capture_width',  default=3280)
             ch  = self.config.get('camera', 'capture_height', default=2464)
             fps = self.config.get('camera', 'preview_fps',    default=24)
-            self.camera = CameraBackend((pw, ph), (cw, ch), fps)
-            av['camera'] = True
-            logger.info("✓ Camera")
-        except Exception as e:
-            logger.error(f"Camera init failed: {e}")
+            retries = 3
+            retry_delay_s = 0.35
+            last_error = None
             self.camera = None
-            av['camera'] = False
+            for attempt in range(1, retries + 1):
+                try:
+                    self.camera = CameraBackend((pw, ph), (cw, ch), fps)
+                    break
+                except Exception as cam_exc:
+                    last_error = cam_exc
+                    logger.error(f"Camera init attempt {attempt}/{retries} failed: {cam_exc}")
+                    if attempt < retries:
+                        time.sleep(retry_delay_s)
+
+            if self.camera is None:
+                raise RuntimeError(f"Camera backend init failed after {retries} attempts: {last_error}")
+
+            av['camera'] = True
+            logger.info("Camera initialized")
+        except Exception as e:
+            logger.critical(f"Camera init failed: {e}")
+            raise RuntimeError("Camera initialization failed on Raspberry Pi") from e
 
         try:
+            if RotaryEncoder is None:
+                raise RuntimeError(HARDWARE_IMPORT_ERRORS.get('encoder', 'backend import failed'))
             self.encoder = RotaryEncoder(5, 6, 2.0, self._encoder_cw, self._encoder_ccw)
             av['encoder'] = True
-            logger.info("✓ Encoder")
+            logger.info("Encoder initialized")
         except Exception as e:
             logger.error(f"Encoder init failed: {e}")
             self.encoder = None
             av['encoder'] = False
 
         try:
+            if DebouncedButton is None:
+                raise RuntimeError(HARDWARE_IMPORT_ERRORS.get('buttons', 'backend import failed'))
             self.encoder_button = DebouncedButton(13, 50, self._encoder_button_press, self._encoder_button_release)
             self.shutter_button = DebouncedButton(26, 50, self._shutter_press)
             av['buttons'] = True
-            logger.info("✓ Buttons")
+            logger.info("Buttons initialized")
         except Exception as e:
             logger.error(f"Buttons init failed: {e}")
             self.encoder_button = None
@@ -462,56 +481,68 @@ class CameraApp:
             av['buttons'] = False
 
         try:
+            if HapticDriver is None:
+                raise RuntimeError(HARDWARE_IMPORT_ERRORS.get('haptic', 'backend import failed'))
             self.haptic = HapticDriver()
             av['haptic'] = self.haptic.available
-            if self.haptic.available: logger.info("✓ Haptic")
+            if self.haptic.available: logger.info("Haptic initialized")
         except Exception as e:
             logger.error(f"Haptic init failed: {e}")
             self.haptic = None
             av['haptic'] = False
 
         try:
+            if LightSensor is None:
+                raise RuntimeError(HARDWARE_IMPORT_ERRORS.get('light_sensor', 'backend import failed'))
             self.light_sensor = LightSensor()
             av['light_sensor'] = self.light_sensor.available
-            if self.light_sensor.available: logger.info("✓ Light Sensor")
+            if self.light_sensor.available: logger.info("Light Sensor initialized")
         except Exception as e:
             logger.error(f"Light sensor init failed: {e}")
             self.light_sensor = None
             av['light_sensor'] = False
 
         try:
+            if Gyroscope is None:
+                raise RuntimeError(HARDWARE_IMPORT_ERRORS.get('gyro', 'backend import failed'))
             self.gyro = Gyroscope()
             av['gyro'] = self.gyro.available
-            if self.gyro.available: logger.info("✓ Gyroscope")
+            if self.gyro.available: logger.info("Gyroscope initialized")
         except Exception as e:
             logger.error(f"Gyro init failed: {e}")
             self.gyro = None
             av['gyro'] = False
 
         try:
+            if FlashLED is None:
+                raise RuntimeError(HARDWARE_IMPORT_ERRORS.get('flash_led', 'backend import failed'))
             flash_dur = self.config.get('flash', 'pulse_duration_ms', default=120)
             self.flash_led = FlashLED(27, flash_dur)
             av['flash_led'] = True
-            logger.info("✓ Flash LED")
+            logger.info("Flash LED initialized")
         except Exception as e:
             logger.error(f"Flash LED init failed: {e}")
             self.flash_led = None
             av['flash_led'] = False
 
         try:
+            if BatteryMonitor is None:
+                raise RuntimeError(HARDWARE_IMPORT_ERRORS.get('battery', 'backend import failed'))
             self.battery = BatteryMonitor()
             av['battery'] = self.battery.available
-            if self.battery.available: logger.info("✓ Battery")
+            if self.battery.available: logger.info("Battery initialized")
         except Exception as e:
             logger.error(f"Battery init failed: {e}")
             self.battery = None
             av['battery'] = False
 
         try:
+            if BrightnessController is None:
+                raise RuntimeError(HARDWARE_IMPORT_ERRORS.get('brightness', 'backend import failed'))
             self.brightness_ctrl = BrightnessController()
             av['brightness'] = self.brightness_ctrl.available
             if self.brightness_ctrl.available:
-                logger.info("✓ Brightness")
+                logger.info("Brightness initialized")
                 mode = self.config.get('display', 'brightness_mode', default='medium')
                 if mode != 'auto':
                     values = {
@@ -522,7 +553,7 @@ class CameraApp:
                     self.brightness_ctrl.set_brightness(values.get(mode, 120))
         except Exception as e:
             logger.error(f"Brightness init failed: {e}")
-            self.brightness_ctrl = BrightnessController()
+            self.brightness_ctrl = _NoopBrightnessController()
             av['brightness'] = False
 
         return av
@@ -632,7 +663,7 @@ class CameraApp:
                     if self.power_manager.is_standby():
                         if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN, pygame.FINGERDOWN):
                             self.power_manager.update_activity()
-                            logger.info("⏰ Woke from standby")
+                            logger.info("Woke from standby")
                         continue
 
                     # Mouse (PC Simulator + Pi Touch via X11)
@@ -654,8 +685,8 @@ class CameraApp:
                     # Finger Touch (direktes KMS/DRM Touch Event)
                     elif event.type == pygame.FINGERDOWN:
                         self.power_manager.update_activity()
-                        px = int(event.x * PHYSICAL_W)
-                        py = int(event.y * PHYSICAL_H)
+                        px = int(event.x * LOGICAL_W)
+                        py = int(event.y * LOGICAL_H)
                         lx, ly = self._rotate_touch(px, py)
                         scene_name = self.state_machine.current_state.value
                         result = self.hitbox_engine.hit_test(scene_name, lx, ly)
@@ -694,12 +725,7 @@ class CameraApp:
                     # Logger overlay auf logical_surface
                     logger.render_ui(self.logical_surface)
 
-                    # == SOFTWARE ROTATION 90° RECHTS ==================
-                    # logical_surface (480x800) → rotate(-90°) → (800x480)
-                    # Auf physisches Display (800x480) blitten
-                    rotated = pygame.transform.rotate(self.logical_surface, -90)
-                    self.screen.blit(rotated, (0, 0))
-                    # ==================================================
+                    self.screen.blit(self.logical_surface, (0, 0))
 
                     pygame.display.flip()
                 else:
@@ -791,27 +817,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-```
-
----
-
-# 📋 **WAS GEÄNDERT WURDE - ÜBERSICHT**
-```
-main.py Änderungen:
----------------------------------------------------
-✅ IS_RASPBERRY_PI = True  (hardcoded, kein detect_platform)
-✅ IS_RASPBERRY_PI = False VERBOTEN im except Block
-✅ SOFTWARE ROTATION 90° rechts via pygame.transform.rotate
-✅ PHYSICAL 800x480 + LOGICAL 480x800 Surface System
-✅ Touch-Koordinaten werden mitrotiert (_rotate_touch)
-✅ Standby = 10 Sekunden (default=10)
-✅ Standby = echter schwarzer Screen + sleep(0.2)
-```
-
----
-
-# 🗑️ **DIESE DATEIEN IN VS CODE LÖSCHEN!**
-```
-selimcam2/picamera2.py   ← Rechtsklick → Delete
-selimcam2/smbus2.py      ← Rechtsklick → Delete
-selimcam2/gpiozero.py    ← Rechtsklick → Delete

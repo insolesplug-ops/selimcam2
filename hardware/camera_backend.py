@@ -4,9 +4,19 @@ CameraBackend - REAL HARDWARE
 Pi 3A+ Optimiert
 """
 import time
+import logging
 import numpy as np
 import threading
 from typing import Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+try:
+    from picamera2 import Picamera2
+    _PICAMERA2_IMPORT_ERROR = None
+except Exception as exc:
+    Picamera2 = None
+    _PICAMERA2_IMPORT_ERROR = exc
 
 
 class CameraBackend:
@@ -18,8 +28,10 @@ class CameraBackend:
         capture_size: Tuple[int, int] = (3280, 2464),
         preview_fps: int = 24
     ):
-        from picamera2 import Picamera2
-        print("[CameraBackend] Init REAL PiCamera2 - 8MP IMX219")
+        if Picamera2 is None:
+            raise RuntimeError(f"Picamera2 import failed: {_PICAMERA2_IMPORT_ERROR}")
+
+        logger.info("CameraBackend init: real Picamera2 (IMX219)")
 
         self.preview_size = preview_size
         self.capture_size = capture_size
@@ -32,7 +44,7 @@ class CameraBackend:
         self.camera = Picamera2()
         self._configure_preview()
 
-        print(f"[CameraBackend] Ready: {preview_size[0]}x{preview_size[1]} @ {preview_fps}fps")
+        logger.info("CameraBackend ready: %dx%d @ %dfps", preview_size[0], preview_size[1], preview_fps)
 
     def _configure_preview(self):
         cfg = self.camera.create_preview_configuration(
@@ -56,9 +68,9 @@ class CameraBackend:
             self.camera.start()
             self.is_running = True
             time.sleep(0.15)
-            print("[CameraBackend] Preview started")
+            logger.info("Camera preview started")
         except Exception as e:
-            print(f"[CameraBackend] Start failed: {e}")
+            logger.error("Camera preview start failed: %s", e)
             raise
 
     def stop_preview(self):
@@ -87,7 +99,7 @@ class CameraBackend:
         try:
             return self.camera.capture_array("main").copy()
         except Exception as e:
-            print(f"[CameraBackend] capture_array failed: {e}")
+            logger.error("Camera capture_array failed: %s", e)
             return None
 
     def capture_photo(self, filepath: str, quality: int = 92) -> bool:
@@ -104,10 +116,10 @@ class CameraBackend:
                 self._configure_preview()
                 self.camera.start()
                 self.is_running = True
-            print(f"[CameraBackend] Photo saved: {filepath}")
+            logger.info("Camera photo saved: %s", filepath)
             return True
         except Exception as e:
-            print(f"[CameraBackend] Photo failed: {e}")
+            logger.error("Camera photo capture failed: %s", e)
             if was_running:
                 try:
                     self._configure_preview()
@@ -128,6 +140,6 @@ class CameraBackend:
             if self.is_running:
                 self.camera.stop()
             self.camera.close()
-            print("[CameraBackend] Cleanup done")
+            logger.info("Camera backend cleanup done")
         except Exception:
             pass

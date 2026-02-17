@@ -139,7 +139,7 @@ class CameraScene:
     
     def _capture_photo(self):
         """Capture photo with filter/ISO and freeze frame."""
-        logger.info("📸 Capture triggered")
+        logger.info("Capture triggered")
         
         # Determine flash
         flash_mode = self.app.config.get('flash', 'mode', default='off')
@@ -196,7 +196,7 @@ class CameraScene:
         filepath = self.photo_store.save_photo(processed_frame, extension='jpg')
         
         if filepath:
-            logger.info(f"✓ Saved (filter={filter_type_str}, ISO={iso_value}): {filepath.name}")
+            logger.info(f"Saved (filter={filter_type_str}, ISO={iso_value}): {filepath.name}")
             
             # Haptic feedback
             if self.app.haptic and self.app.haptic.available:

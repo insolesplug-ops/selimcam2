@@ -101,7 +101,7 @@ class BootScene:
             screen.blit(scaled_logo, logo_rect)
         else:
             # Text fallback with glow effect
-            title_text = "🎥 SelimCam"
+            title_text = "SelimCam"
             title_surf = self.font_bold.render(title_text, True, (100, 200, 255))
             
             # Glow background (subtle)

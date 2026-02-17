@@ -29,9 +29,9 @@ def detect_platform():
 IS_RASPBERRY_PI = detect_platform()
 
 if IS_RASPBERRY_PI:
-    print("[Platform] 🍓 Raspberry Pi detected - using hardware backends")
+    print("[Platform] Raspberry Pi detected - using hardware backends")
 else:
-    print("[Platform] 💻 Non-Pi system detected - using simulators")
+    print("[Platform] Non-Pi system detected - using simulators")
     print("\n" + "="*60)
     print(" SIMULATOR CONTROLS:")
     print("="*60)
@@ -467,7 +467,7 @@ class CameraApp:
             
             self.camera = CameraBackend((preview_w, preview_h), (capture_w, capture_h), preview_fps)
             availability['camera'] = True
-            logger.info("✓ Camera")
+            logger.info("Camera initialized")
         except Exception as e:
             logger.error(f"Camera init failed: {e}")
             self.camera = None
@@ -477,7 +477,7 @@ class CameraApp:
         try:
             self.encoder = RotaryEncoder(5, 6, 2.0, self._encoder_cw, self._encoder_ccw)
             availability['encoder'] = True
-            logger.info("✓ Encoder")
+            logger.info("Encoder initialized")
         except Exception as e:
             logger.error(f"Encoder init failed: {e}")
             self.encoder = None
@@ -488,7 +488,7 @@ class CameraApp:
             self.encoder_button = DebouncedButton(13, 50, self._encoder_button_press, self._encoder_button_release)
             self.shutter_button = DebouncedButton(26, 50, self._shutter_press)
             availability['buttons'] = True
-            logger.info("✓ Buttons")
+            logger.info("Buttons initialized")
         except Exception as e:
             logger.error(f"Buttons init failed: {e}")
             self.encoder_button = None
@@ -500,7 +500,7 @@ class CameraApp:
             self.haptic = HapticDriver()
             availability['haptic'] = self.haptic.available
             if self.haptic.available:
-                logger.info("✓ Haptic")
+                logger.info("Haptic initialized")
         except Exception as e:
             logger.error(f"Haptic init failed: {e}")
             self.haptic = None
@@ -511,7 +511,7 @@ class CameraApp:
             self.light_sensor = LightSensor()
             availability['light_sensor'] = self.light_sensor.available
             if self.light_sensor.available:
-                logger.info("✓ Light Sensor")
+                logger.info("Light Sensor initialized")
         except Exception as e:
             logger.error(f"Light sensor init failed: {e}")
             self.light_sensor = None
@@ -522,7 +522,7 @@ class CameraApp:
             self.gyro = Gyroscope()
             availability['gyro'] = self.gyro.available
             if self.gyro.available:
-                logger.info("✓ Gyroscope")
+                logger.info("Gyroscope initialized")
         except Exception as e:
             logger.error(f"Gyro init failed: {e}")
             self.gyro = None
@@ -533,7 +533,7 @@ class CameraApp:
             flash_duration = self.config.get('flash', 'pulse_duration_ms', default=120)
             self.flash_led = FlashLED(27, flash_duration)
             availability['flash_led'] = True
-            logger.info("✓ Flash LED")
+            logger.info("Flash LED initialized")
         except Exception as e:
             logger.error(f"Flash LED init failed: {e}")
             self.flash_led = None
@@ -544,7 +544,7 @@ class CameraApp:
             self.battery = BatteryMonitor()
             availability['battery'] = self.battery.available
             if self.battery.available:
-                logger.info("✓ Battery")
+                logger.info("Battery initialized")
         except Exception as e:
             logger.error(f"Battery init failed: {e}")
             self.battery = None
@@ -555,7 +555,7 @@ class CameraApp:
             self.brightness_ctrl = BrightnessController()
             availability['brightness'] = self.brightness_ctrl.available
             if self.brightness_ctrl.available:
-                logger.info("✓ Brightness")
+                logger.info("Brightness initialized")
                 mode = self.config.get('display', 'brightness_mode', default='medium')
                 if mode != 'auto':
                     values = {

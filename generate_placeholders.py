@@ -33,7 +33,7 @@ def create_placeholder(path, width, height, text, bg_color, text_color):
     
     os.makedirs(os.path.dirname(path), exist_ok=True)
     img.save(path)
-    print(f"✓ Created: {path}")
+    print(f"Created: {path}")
 
 # Create directories
 os.makedirs("assets/ui", exist_ok=True)
@@ -68,5 +68,5 @@ create_placeholder("assets/ui/boot_logo.png", 200, 200, "CAM",
                   (30, 30, 30, 255), (255, 255, 255))  # SOLID background
 
 print("\n" + "="*60)
-print(" ✓ VISIBLE ASSETS GENERATED")
+print(" VISIBLE ASSETS GENERATED")
 print("="*60)

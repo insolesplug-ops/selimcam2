@@ -123,7 +123,7 @@ class GalleryScene:
         
         try:
             photo_path.unlink()
-            print(f"[Gallery] ✓ Deleted: {photo_path.name}")
+            print(f"[Gallery] Deleted: {photo_path.name}")
             
             # Refresh photos list
             self.photos = self.photo_store.list_photos()
@@ -140,7 +140,7 @@ class GalleryScene:
                 self.app.haptic.play_effect(14, 0.6)
         
         except Exception as e:
-            print(f"[Gallery] ✗ Delete failed: {e}")
+            print(f"[Gallery] Delete failed: {e}")
     
     def _load_photo_surface(self, index: int) -> Optional[pygame.Surface]:
         """Load photo as pygame surface (with caching)."""
@@ -182,7 +182,7 @@ class GalleryScene:
             return surf
             
         except Exception as e:
-            print(f"[GalleryScene] ✗ Load photo failed: {e}")
+            print(f"[GalleryScene] Load photo failed: {e}")
             return None
     
     def handle_encoder_rotation(self, delta: int):

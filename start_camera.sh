@@ -1,23 +1,33 @@
 #!/bin/bash
-# SelimCam - Automatic startup script for Raspberry Pi
-# Place in /home/pi/ or set as systemd service
-# chmod +x to make executable
 
-# Enable quiet mode (no console spam)
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
+
+export PYTHONUNBUFFERED=1
 export SELIMCAM_QUIET=true
+export SDL_VIDEODRIVER="kmsdrm"
+export SDL_VIDEO_KMSDRM_ROTATION="270"
+export SDL_FBDEV_ROTATION="270"
 
-# Ensure camera is enabled
-# (You can check: cat /boot/config.txt | grep camera_enabled)
+if [[ -f ".venv/bin/activate" ]]; then
+	# shellcheck disable=SC1091
+	source ".venv/bin/activate"
+fi
 
-# Set working directory
-cd /home/pi/FINALMAINCAMMM
+if ! python3 -c "import pygame, numpy, PIL" >/dev/null 2>&1; then
+	python3 -m pip install --no-cache-dir -r requirements.txt || true
+fi
 
-# Activate virtual environment
-source .venv/bin/activate
+if ! python3 -c "from picamera2 import Picamera2" >/dev/null 2>&1; then
+	echo "[SelimCam] ERROR: picamera2 import failed. Install system package: sudo apt install python3-picamera2" >&2
+	exit 1
+fi
 
-# Run the application
-python3 main.py
+if command -v vcgencmd >/dev/null 2>&1; then
+	CAM_STATE="$(vcgencmd get_camera || true)"
+	echo "[SelimCam] ${CAM_STATE}"
+fi
 
-# If app crashes, wait before restart
-sleep 5
-echo "App exited with status $?"
+exec python3 main.py

@@ -50,13 +50,13 @@ class HitboxLoader:
                         data = json.load(f)
                     
                     self.hitboxes[filename] = data.get('hitboxes', [])
-                    print(f"[HitboxLoader] ✓ Loaded {filename}: {len(self.hitboxes[filename])} hitboxes")
+                    print(f"[HitboxLoader] Loaded {filename}: {len(self.hitboxes[filename])} hitboxes")
                     return True
                 except Exception as e:
-                    print(f"[HitboxLoader] ✗ Failed to load {path}: {e}")
+                    print(f"[HitboxLoader] Failed to load {path}: {e}")
                     return False
         
-        print(f"[HitboxLoader] ✗ File not found: {filename}")
+        print(f"[HitboxLoader] File not found: {filename}")
         print(f"[HitboxLoader]   Searched: {search_paths}")
         return False
     

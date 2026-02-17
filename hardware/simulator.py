@@ -61,10 +61,10 @@ class CameraSimulator:
             from PIL import Image
             img = Image.fromarray(frame)
             img.save(filepath, quality=quality)
-            print(f"[CameraSim] ✓ Captured: {filepath}")
+            print(f"[CameraSim] Captured: {filepath}")
             return True
         except Exception as e:
-            print(f"[CameraSim] ✗ Capture failed: {e}")
+            print(f"[CameraSim] Capture failed: {e}")
             return False
     
     def capture_array(self) -> Optional[np.ndarray]:
@@ -148,7 +148,7 @@ class HapticSimulator:
     def play_effect(self, effect_id: int, strength: float = 1.0):
         effects = {1: "TICK", 10: "CONFIRM", 14: "ERROR", 47: "CAPTURE", 52: "SUCCESS"}
         name = effects.get(effect_id, f"EFFECT_{effect_id}")
-        print(f"[HapticSim] ⚡ {name} @ {strength:.1f}")
+        print(f"[HapticSim] {name} @ {strength:.1f}")
     
     def cleanup(self):
         pass
@@ -205,11 +205,11 @@ class FlashLEDSimulator:
     
     def on(self):
         self.is_on = True
-        print("[FlashSim] 💡 ON")
+        print("[FlashSim] ON")
     
     def off(self):
         self.is_on = False
-        print("[FlashSim] 💡 OFF")
+        print("[FlashSim] OFF")
     
     def pulse(self, duration_ms: int):
         self.on()
@@ -249,7 +249,7 @@ class BrightnessSimulator:
     
     def set_brightness(self, value: int) -> bool:
         self.brightness = max(0, min(self.max_brightness, value))
-        print(f"[BrightnessSim] 🔆 {self.brightness}/{self.max_brightness}")
+        print(f"[BrightnessSim] {self.brightness}/{self.max_brightness}")
         return True
     
     def set_brightness_percent(self, percent: int) -> bool:

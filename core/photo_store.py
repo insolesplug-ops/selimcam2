@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Optional, List  # ✅ FIXED: Optional importiert
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -39,7 +39,7 @@ class PhotoStore:
             
             return photos
         except Exception as e:
-            print(f"[PhotoStore] ✗ List photos failed: {e}")
+            print(f"[PhotoStore] List photos failed: {e}")
             return []
     
     def save_photo(self, image_data, extension: str = "jpg") -> Optional[Path]:
@@ -80,11 +80,11 @@ class PhotoStore:
             else:
                 raise TypeError(f"Unsupported image type: {type(image_data)}")
             
-            print(f"[PhotoStore] ✓ Saved: {filepath.name}")
+            print(f"[PhotoStore] Saved: {filepath.name}")
             return filepath
             
         except Exception as e:
-            print(f"[PhotoStore] ✗ Save failed: {e}")
+            print(f"[PhotoStore] Save failed: {e}")
             return None
     
     def get_photo_count(self) -> int:
@@ -109,4 +109,4 @@ class PhotoStore:
                 photo.unlink()
                 print(f"[PhotoStore] Deleted: {photo.name}")
             except Exception as e:
-                print(f"[PhotoStore] ✗ Delete failed: {e}")
+                print(f"[PhotoStore] Delete failed: {e}")

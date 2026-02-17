@@ -12,26 +12,26 @@ def run_command(cmd, description):
     print(f"\n[SETUP] {description}...")
     try:
         result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-        print(f"[SETUP] ✓ {description} successful")
+        print(f"[SETUP] OK {description} successful")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"[SETUP] ✗ {description} failed:")
+        print(f"[SETUP] ERROR {description} failed:")
         print(e.stderr)
         return False
 
 def check_file(path, description):
     """Check if file exists."""
     if os.path.exists(path):
-        print(f"[SETUP] ✓ {description} found")
+        print(f"[SETUP] OK {description} found")
         return True
     else:
-        print(f"[SETUP] ✗ {description} missing")
+        print(f"[SETUP] ERROR {description} missing")
         return False
 
 def create_directory(path):
     """Create directory if not exists."""
     os.makedirs(path, exist_ok=True)
-    print(f"[SETUP] ✓ Created {path}")
+    print(f"[SETUP] OK Created {path}")
 
 print("="*70)
 print(" SELIMCAM v2.0 - AUTOMATED SETUP")
@@ -55,7 +55,7 @@ for d in init_dirs:
     if not os.path.exists(init_file):
         with open(init_file, 'w') as f:
             f.write(f'"""{d.capitalize()} module."""\n')
-        print(f"[SETUP] ✓ Created {init_file}")
+        print(f"[SETUP] OK Created {init_file}")
 
 # Step 3: Install dependencies
 print("\n[STEP 3] Installing Python dependencies...")
@@ -66,7 +66,7 @@ print("\n[STEP 4] Generating placeholder assets...")
 if os.path.exists("generate_placeholders.py"):
     run_command("python generate_placeholders.py", "Placeholder generation")
 else:
-    print("[SETUP] ⚠️ generate_placeholders.py not found")
+    print("[SETUP] WARN generate_placeholders.py not found")
 
 # Step 5: Verify files
 print("\n[STEP 5] Verifying file structure...")
@@ -90,7 +90,7 @@ font_regular = "assets/fonts/Inter_regular.ttf"
 font_bold = "assets/fonts/inter_bold.ttf"
 
 if not os.path.exists(font_regular) or not os.path.exists(font_bold):
-    print("[SETUP] ⚠️ Fonts missing - app will use system fonts")
+    print("[SETUP] WARN Fonts missing - app will use system fonts")
     print("To add custom fonts:")
     print("  1. Download from: https://fonts.google.com/specimen/Inter")
     print(f"  2. Copy Inter-Regular.ttf → {font_regular}")
@@ -99,12 +99,12 @@ if not os.path.exists(font_regular) or not os.path.exists(font_bold):
 # Final report
 print("\n" + "="*70)
 if all_ok:
-    print(" ✓ SETUP COMPLETE - READY TO RUN")
+    print(" OK SETUP COMPLETE - READY TO RUN")
     print("="*70)
     print("\nRun the app with:")
     print("  python main.py")
 else:
-    print(" ⚠️ SETUP INCOMPLETE - MISSING FILES")
+    print(" WARN SETUP INCOMPLETE - MISSING FILES")
     print("="*70)
     print("\nSome files are missing. Please ensure all code files are present.")
 
