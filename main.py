@@ -631,16 +631,84 @@ class CameraApp:
         self.freeze_frame     = FreezeFrame(freeze_dur)
 
     def _init_scenes(self):
-        self.scenes = {
-            AppState.BOOT:     BootScene(self),
-            AppState.CAMERA:   CameraScene(self),
-            AppState.SETTINGS: SettingsScene(self),
-            AppState.GALLERY:  GalleryScene(self),
-        }
-        for state, scene in self.scenes.items():
-            self.state_machine.on_enter(state, scene.on_enter)
-            self.state_machine.on_exit(state,  scene.on_exit)
-        self.scenes[AppState.BOOT].on_enter()
+        """Initialize all scenes with error handling."""
+        self.scenes = {}
+        
+        # Initialize each scene with try-except
+        scene_configs = [
+            (AppState.BOOT,     BootScene),
+            (AppState.CAMERA,   CameraScene),
+            (AppState.SETTINGS, SettingsScene),
+            (AppState.GALLERY,  GalleryScene),
+        ]
+        
+        for state, SceneClass in scene_configs:
+            try:
+                scene = SceneClass(self)
+                self.scenes[state] = scene
+                self.state_machine.on_enter(state, self._make_on_enter_safe(scene))
+                self.state_machine.on_exit(state, self._make_on_exit_safe(scene))
+                logger.info(f"[Scene] {SceneClass.__name__} initialized")
+            except Exception as e:
+                logger.error(f"[Scene] {SceneClass.__name__} init failed: {e}")
+                traceback.print_exc()
+                # Create fallback scene
+                scene = self._create_fallback_scene(state)
+                self.scenes[state] = scene
+        
+        # Enter boot scene
+        if AppState.BOOT in self.scenes:
+            try:
+                self.scenes[AppState.BOOT].on_enter()
+            except Exception as e:
+                logger.error(f"[Scene] Boot on_enter failed: {e}")
+    
+    def _make_on_enter_safe(self, scene):
+        """Create a safe wrapper for scene.on_enter()."""
+        def safe_on_enter():
+            try:
+                scene.on_enter()
+            except Exception as e:
+                logger.error(f"[Scene] {scene.__class__.__name__}.on_enter failed: {e}")
+                traceback.print_exc()
+        return safe_on_enter
+    
+    def _make_on_exit_safe(self, scene):
+        """Create a safe wrapper for scene.on_exit()."""
+        def safe_on_exit():
+            try:
+                scene.on_exit()
+            except Exception as e:
+                logger.error(f"[Scene] {scene.__class__.__name__}.on_exit failed: {e}")
+                traceback.print_exc()
+        return safe_on_exit
+    
+    def _create_fallback_scene(self, state: AppState):
+        """Create a minimal fallback scene if main scene fails."""
+        class FallbackScene:
+            def __init__(self, state_name):
+                self.state_name = state_name
+                self.font = pygame.font.SysFont("Arial", 32)
+            
+            def on_enter(self):
+                pass
+            
+            def on_exit(self):
+                pass
+            
+            def handle_event(self, event):
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    pass  # Allow escape
+            
+            def update(self, dt):
+                pass
+            
+            def render(self, screen):
+                screen.fill((0, 0, 0))
+                text = self.font.render(f"Scene Error: {self.state_name}", True, (255, 0, 0))
+                screen.blit(text, (50, 200))
+        
+        return FallbackScene(state.value)
 
     # ── ENCODER CALLBACKS ────────────────────────────────────────────
     def _encoder_cw(self):
@@ -756,7 +824,10 @@ class CameraApp:
                         else:
                             scene = self.scenes.get(self.state_machine.current_state)
                             if scene:
-                                scene.handle_event(rotated_event)
+                                try:
+                                    scene.handle_event(rotated_event)
+                                except Exception as e:
+                                    logger.error(f"[Scene] handle_event failed: {e}")
 
                     # Finger Touch (direktes KMS/DRM Touch Event)
                     elif event.type == pygame.FINGERDOWN:
@@ -784,7 +855,10 @@ class CameraApp:
                         else:
                             scene = self.scenes.get(self.state_machine.current_state)
                             if scene:
-                                scene.handle_event(rotated_event)
+                                try:
+                                    scene.handle_event(rotated_event)
+                                except Exception as e:
+                                    logger.error(f"[Scene] handle_event failed: {e}")
 
                     elif event.type == pygame.KEYDOWN:
                         self.power_manager.update_activity()
@@ -793,11 +867,17 @@ class CameraApp:
                         else:
                             scene = self.scenes.get(self.state_machine.current_state)
                             if scene:
-                                scene.handle_event(event)
+                                try:
+                                    scene.handle_event(event)
+                                except Exception as e:
+                                    logger.error(f"[Scene] handle_event failed: {e}")
                     else:
                         scene = self.scenes.get(self.state_machine.current_state)
                         if scene:
-                            scene.handle_event(event)
+                            try:
+                                scene.handle_event(event)
+                            except Exception as e:
+                                logger.error(f"[Scene] handle_event failed: {e}")
 
                 if frame_skip:
                     frame_skip = False
@@ -806,7 +886,10 @@ class CameraApp:
                 # Update
                 scene = self.scenes.get(self.state_machine.current_state)
                 if scene:
-                    scene.update(dt)
+                    try:
+                        scene.update(dt)
+                    except Exception as e:
+                        logger.error(f"[Scene] {scene.__class__.__name__}.update failed: {e}")
 
                 # Render
                 if not self.power_manager.is_standby():
@@ -814,8 +897,10 @@ class CameraApp:
                     self.logical_surface.fill((0, 0, 0))
                     
                     if scene:
-                        # Scene rendert auf logical_surface (PORTRAIT 480x800)
-                        scene.render(self.logical_surface)
+                        try:
+                            scene.render(self.logical_surface)
+                        except Exception as e:
+                            logger.error(f"[Scene] {scene.__class__.__name__}.render failed: {e}")
 
                     # Logger overlay auf logical_surface
                     logger.render_ui(self.logical_surface)
