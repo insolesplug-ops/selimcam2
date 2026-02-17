@@ -150,7 +150,10 @@ class CameraBackend:
         if not self.is_running:
             return None
         with self._frame_lock:
-            return self._last_frame.copy() if self._last_frame is not None else None
+            frame = self._last_frame.copy() if self._last_frame is not None else None
+            if frame is not None:
+                logger.debug(f"[CAMERA] get_preview_frame() → shape={frame.shape}, dtype={frame.dtype}")
+            return frame
 
     def capture_array(self) -> Optional[np.ndarray]:
         if not self.is_running:

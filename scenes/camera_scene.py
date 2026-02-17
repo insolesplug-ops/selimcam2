@@ -254,19 +254,19 @@ class CameraScene:
             if hasattr(self.app.camera, "get_preview_surface"):
                 preview_surface = self.app.camera.get_preview_surface()
             frame = self.app.camera.get_preview_frame()
-            logger.debug(f"[CameraScene] camera.get_preview_surface()={preview_surface is not None}, camera.get_preview_frame()={frame is not None if frame is not None else 'None'}")
+            logger.debug(f"[RENDER] Camera preview: surface={preview_surface is not None}, frame={frame is not None}")
         else:
-            logger.error("[CameraScene] Camera backend NOT initialized!")
+            logger.error("[RENDER] ✗ Camera not initialized!")
 
         if preview_surface is not None:
-            logger.debug(f"[CameraScene] Rendering preview_surface: {preview_surface.get_size()}")
+            logger.debug(f"[RENDER] Using preview_surface: {preview_surface.get_size()}")
             screen_w = self.app.config.get('display', 'width', default=480)
             screen_h = self.app.config.get('display', 'height', default=800)
             if preview_surface.get_size() != (screen_w, screen_h):
                 preview_surface = pygame.transform.scale(preview_surface, (screen_w, screen_h))
             screen.blit(preview_surface, (0, 0))
         elif frame is not None:
-            logger.debug(f"[CameraScene] Rendering numpy frame: shape={frame.shape}")
+            logger.debug(f"[RENDER] Converting numpy frame to surface")
             filter_type_str = self.app.config.get('filter', 'active', default='none')
             filter_type = FilterType(filter_type_str)
             iso_value = self.app.config.get('filter', 'iso_fake', default=400)
@@ -276,14 +276,15 @@ class CameraScene:
             surf = self._frame_to_surface(zoomed_frame)
 
             if surf:
+                logger.debug(f"[RENDER] ✓ Blitting frame surface {surf.get_size()} to screen")
                 screen.blit(surf, (0, 0))
             else:
-                logger.error("[CameraScene] _frame_to_surface() returned None!")
+                logger.error("[RENDER] ✗ _frame_to_surface() returned None!")
                 screen.fill((20, 20, 20))
                 self._render_error(screen, "Frame conversion failed")
         else:
             # No frame - show placeholder
-            logger.debug("[CameraScene] No frames available - showing blank screen")
+            logger.debug("[RENDER] ⚠ No camera frames available - showing blank")
             screen.fill((30, 30, 30))
             self._render_placeholder(screen)
         
@@ -369,25 +370,59 @@ class CameraScene:
         return frame[y1:y2, x1:x2]
     
     def _frame_to_surface(self, frame: np.ndarray) -> Optional[pygame.Surface]:
-        """Convert numpy frame to pygame surface with 90° CW rotation for portrait mode."""
+        """Convert numpy frame to pygame surface with rotation for portrait mode.
+        
+        Frame pipeline:
+        1. Camera outputs (480, 640, 3) - landscape from IMX219 sensor
+        2. Need to rotate to match portrait display
+        3. Scale to display dimensions (480, 800)
+        
+        Test rotation values (set in config.json):
+        "camera": {"rotation_test": 0}  # 0:-1 (90°CW), 1: 1 (90°CCW), 2: 2 (180°), 3: none
+        """
         try:
             screen_w, screen_h = self.app.logical_surface.get_size()
+            logger.debug(f"[FRAME_PIPELINE] Input: shape={frame.shape}, dtype={frame.dtype}")
+            logger.debug(f"[FRAME_PIPELINE] Target display: {screen_w}x{screen_h}")
             
-            # Rotate frame 90° clockwise: landscape (480, 640) -> portrait (640, 480)
-            # np.rot90(k=-1) rotates 90° CW
-            rotated = np.rot90(frame, k=-1)
-            logger.debug(f"[Frame] Original: {frame.shape} → Rotated: {rotated.shape}")
+            # Get rotation test mode from config
+            rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
             
-            # Convert to pygame surface
-            surf = pygame.surfarray.make_surface(np.swapaxes(rotated, 0, 1))
+            # Apply rotation based on test mode
+            if rotation_mode == 0:
+                # Default: 90° CW (k=-1)
+                rotated = np.rot90(frame, k=-1)
+                logger.debug(f"[FRAME] Rotation mode 0 (90° CW): {frame.shape} → {rotated.shape}")
+            elif rotation_mode == 1:
+                # Alternative: 90° CCW (k=1)
+                rotated = np.rot90(frame, k=1)
+                logger.debug(f"[FRAME] Rotation mode 1 (90° CCW): {frame.shape} → {rotated.shape}")
+            elif rotation_mode == 2:
+                # Alternative: 180° (k=2)
+                rotated = np.rot90(frame, k=2)
+                logger.debug(f"[FRAME] Rotation mode 2 (180°): {frame.shape} → {rotated.shape}")
+            else:
+                # Mode 3+: No rotation
+                rotated = frame
+                logger.debug(f"[FRAME] Rotation mode 3+ (none): {frame.shape} (no rotation)")
+            
+            # Swap axes for pygame.surfarray.make_surface (expects width, height, channels)
+            swapped = np.swapaxes(rotated, 0, 1)
+            logger.debug(f"[FRAME] After swapaxes: {swapped.shape}")
+            
+            # Create pygame surface
+            surf = pygame.surfarray.make_surface(swapped)
+            logger.debug(f"[FRAME] pygame surface: {surf.get_size()}")
             
             # Scale to display dimensions (480x800 portrait)
             if surf.get_size() != (screen_w, screen_h):
+                logger.debug(f"[FRAME] Scaling {surf.get_size()} → {(screen_w, screen_h)}")
                 surf = pygame.transform.scale(surf, (screen_w, screen_h))
             
+            logger.debug(f"[FRAME] ✓ Surface ready: {surf.get_size()}")
             return surf
         except Exception as e:
-            logger.error(f"Frame conversion failed: {e}")
+            logger.error(f"[FRAME] ✗ Conversion failed: {e}", exc_info=True)
             return None
     
     def _render_info_bar(self, screen: pygame.Surface, mode: str):
