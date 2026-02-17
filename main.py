@@ -40,15 +40,14 @@ print("[Platform] Raspberry Pi 3A+ - FORCE MODE")
 # ============================================================
 # DISPLAY ROTATION CONSTANTS
 # ============================================================
-# Global software rotation:
-# - Logical app space stays portrait (480x800)
-# - Physical framebuffer is landscape (800x480)
-# - Final blit rotates logical surface 90° clockwise
+# Global software orientation fix:
+# - Logical and physical app space run portrait (480x800)
+# - Final blit rotates complete surface by 180°
 
 LOGICAL_W  = 480
 LOGICAL_H  = 800
-PHYSICAL_W = 800
-PHYSICAL_H = 480
+PHYSICAL_W = 480
+PHYSICAL_H = 800
 
 # ============================================================
 # CORE IMPORTS
@@ -364,7 +363,7 @@ class CameraApp:
         logger.info(" SelimCam v2.0 - PRODUCTION BUILD")
         logger.info(" Platform: Raspberry Pi 3A+")
         logger.info(f" Display: logical {LOGICAL_W}x{LOGICAL_H}, physical {PHYSICAL_W}x{PHYSICAL_H}")
-        logger.info(" Rotation: software 90 degrees clockwise")
+        logger.info(" Rotation: software 180 degrees")
         logger.info("=" * 70)
 
         self.perf_monitor = PerformanceMonitor()
@@ -380,7 +379,7 @@ class CameraApp:
         ])
         self.config = ConfigManager()
 
-        # Physical framebuffer (landscape)
+        # Physical framebuffer (portrait)
         flags = pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.FULLSCREEN
         self.screen = pygame.display.set_mode((PHYSICAL_W, PHYSICAL_H), flags)
 
@@ -404,6 +403,12 @@ class CameraApp:
 
         self.hitbox_engine = HitboxEngine(load_hitboxes())
         logger.info("Hitbox system initialized")
+
+        self.i2c_hardware_available = {
+            'haptic': True,
+            'light_sensor': True,
+            'gyro': True,
+        }
 
         self.hardware_available = self._init_hardware_safe()
         self._init_ui_components()
@@ -453,13 +458,12 @@ class CameraApp:
     # ── TOUCH KOORDINATEN (PORTRAIT) ────────────────────────────────
     def _rotate_touch(self, px: int, py: int) -> tuple:
         """
-        Physical landscape touch -> logical portrait coordinates.
-        For clockwise render rotation use:
-          new_x = y
-          new_y = width - x
+        180-degree input remap for flipped render surface.
+            new_x = screen_width - old_x
+            new_y = screen_height - old_y
         """
-        lx = int(py)
-        ly = int(PHYSICAL_W - px)
+        lx = int(LOGICAL_W - px)
+        ly = int(LOGICAL_H - py)
         # Clamp
         lx = max(0, min(LOGICAL_W - 1, lx))
         ly = max(0, min(LOGICAL_H - 1, ly))
@@ -537,6 +541,7 @@ class CameraApp:
             logger.error(f"Haptic init failed: {e}")
             self.haptic = None
             av['haptic'] = False
+            self.i2c_hardware_available['haptic'] = False
 
         try:
             if LightSensor is None:
@@ -548,6 +553,7 @@ class CameraApp:
             logger.error(f"Light sensor init failed: {e}")
             self.light_sensor = None
             av['light_sensor'] = False
+            self.i2c_hardware_available['light_sensor'] = False
 
         try:
             if Gyroscope is None:
@@ -559,6 +565,7 @@ class CameraApp:
             logger.error(f"Gyro init failed: {e}")
             self.gyro = None
             av['gyro'] = False
+            self.i2c_hardware_available['gyro'] = False
 
         try:
             if FlashLED is None:
@@ -781,14 +788,14 @@ class CameraApp:
                     # Logger overlay auf logical_surface
                     logger.render_ui(self.logical_surface)
 
-                    rotated = pygame.transform.rotate(self.logical_surface, -90)
+                    rotated = pygame.transform.rotate(self.logical_surface, 180)
                     self.screen.blit(rotated, (0, 0))
 
-                    pygame.display.flip()
+                    pygame.display.update([pygame.Rect(0, 0, PHYSICAL_W, PHYSICAL_H)])
                 else:
                     # Standby: Screen schwarz
                     self.screen.fill((0, 0, 0))
-                    pygame.display.flip()
+                    pygame.display.update([pygame.Rect(0, 0, PHYSICAL_W, PHYSICAL_H)])
                     time.sleep(0.2)
 
                 self.perf_monitor.frame_end()
