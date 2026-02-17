@@ -159,7 +159,8 @@ class ConfigManager:
                 "preview_fps": 24,
                 "capture_width": 2592,
                 "capture_height": 1944,
-                "capture_quality": 92
+                "capture_quality": 92,
+                "rotation_test": 1
             },
             "display": {
                 "width": 480,
@@ -182,7 +183,8 @@ class ConfigManager:
                 "grid_enabled": False,
                 "level_enabled": False,
                 "info_display": "minimal",
-                "freeze_duration_ms": 700
+                "freeze_duration_ms": 700,
+                "flash_overlay_enabled": False
             },
             "zoom": {
                 "current": 1.0,

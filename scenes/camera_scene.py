@@ -305,21 +305,20 @@ class CameraScene:
         if info_mode != 'off':
             self._render_info_bar(screen, info_mode)
         
-        # Flash mode overlay - ALWAYS display (even in 'off' mode)
-        # The overlay PNG contains the full UI with buttons and flash indicator
-        # This MUST be rendered last so it appears on top of all other elements
-        flash_mode = self.app.config.get('flash', 'mode', default='off')
-        flash_overlay = self.flash_overlays.get(flash_mode)
-        if flash_overlay:
-            # Scale overlay to match screen dimensions if needed
-            screen_w = self.app.config.get('display', 'width', default=480)
-            screen_h = self.app.config.get('display', 'height', default=800)
-            
-            overlay_size = flash_overlay.get_size()
-            if overlay_size != (screen_w, screen_h):
-                flash_overlay = pygame.transform.scale(flash_overlay, (screen_w, screen_h))
-            
-            screen.blit(flash_overlay, (0, 0), special_flags=pygame.BLEND_ALPHA_SDL2)
+        # Optional flash overlay. Disabled by default because some placeholder PNGs
+        # can cover the camera image with opaque white regions.
+        if self.app.config.get('ui', 'flash_overlay_enabled', default=False):
+            flash_mode = self.app.config.get('flash', 'mode', default='off')
+            flash_overlay = self.flash_overlays.get(flash_mode)
+            if flash_overlay:
+                screen_w = self.app.config.get('display', 'width', default=480)
+                screen_h = self.app.config.get('display', 'height', default=800)
+
+                overlay_size = flash_overlay.get_size()
+                if overlay_size != (screen_w, screen_h):
+                    flash_overlay = pygame.transform.scale(flash_overlay, (screen_w, screen_h))
+
+                screen.blit(flash_overlay, (0, 0))
         
         # FPS debug
         if self.fps > 0:
@@ -386,7 +385,7 @@ class CameraScene:
         try:
             screen_w, screen_h = self.app.logical_surface.get_size()
             
-            rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
+            rotation_mode = self.app.config.get('camera', 'rotation_test', default=1)
             logger.debug(f"[FRAME] Input: {frame.shape} | Rotation mode: {rotation_mode}")
             
             if rotation_mode == 0:
