@@ -1,0 +1,29 @@
+{
+  "screen_size": [480, 800],
+  "hitboxes": [
+    {
+      "name": "settings",
+      "x": 20,
+      "y": 730,
+      "width": 80,
+      "height": 60,
+      "action": "open_settings"
+    },
+    {
+      "name": "flash",
+      "x": 200,
+      "y": 730,
+      "width": 80,
+      "height": 60,
+      "action": "cycle_flash"
+    },
+    {
+      "name": "gallery",
+      "x": 380,
+      "y": 730,
+      "width": 80,
+      "height": 60,
+      "action": "open_gallery"
+    }
+  ]
+}

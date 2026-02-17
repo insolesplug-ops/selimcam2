@@ -1,0 +1,58 @@
+{
+  "camera": {
+    "preview_width": 640,
+    "preview_height": 480,
+    "preview_fps": 24,
+    "capture_width": 2592,
+    "capture_height": 1944,
+    "capture_quality": 92
+  },
+  "display": {
+    "width": 480,
+    "height": 800,
+    "brightness_mode": "auto",
+    "brightness_dark": 40,
+    "brightness_medium": 120,
+    "brightness_bright": 220
+  },
+  "filter": {
+    "active": "none",
+    "iso_fake": 400
+  },
+  "flash": {
+    "mode": "off",
+    "auto_threshold_lux": 60,
+    "pulse_duration_ms": 120
+  },
+  "ui": {
+    "grid_enabled": false,
+    "level_enabled": false,
+    "info_display": "minimal",
+    "freeze_duration_ms": 700
+  },
+  "zoom": {
+    "current": 1.0,
+    "min": 1.0,
+    "max": 2.5,
+    "step": 0.05,
+    "smooth_factor": 0.25
+  },
+  "haptic": {
+    "enabled": true,
+    "tick": 1,
+    "confirm": 10,
+    "capture": 47,
+    "error": 14
+  },
+  "power": {
+    "standby_timeout_s": 30,
+    "shutdown_long_press_s": 1.8
+  },
+  "datetime": {
+    "last_set": "2026-02-13T14:30:00"
+  },
+  "storage": {
+    "photos_dir": "camera_app_data/photos",
+    "max_photos": 500
+  }
+}

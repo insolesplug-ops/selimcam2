@@ -1,0 +1,10 @@
+# Core
+pygame==2.5.2
+Pillow==10.2.0
+numpy==1.24.4
+
+# Hardware (Raspberry Pi only)
+picamera2==0.3.16
+gpiozero==2.0.1
+smbus2==0.4.3
+RPi.GPIO==0.7.1

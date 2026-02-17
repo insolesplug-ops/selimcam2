@@ -1,0 +1,16 @@
+{
+  "screen": {
+    "width": 480,
+    "height": 800
+  },
+  "hitboxes": [
+    {
+      "id": "back",
+      "x": 0,
+      "y": 730,
+      "width": 150,
+      "height": 70,
+      "description": "Back to camera (bottom-left)"
+    }
+  ]
+}

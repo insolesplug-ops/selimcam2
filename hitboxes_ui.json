@@ -1,0 +1,60 @@
+{
+  "main": {
+    "screen_size": [480, 800],
+    "overlay": "flash off.png",
+    "hitboxes": [
+      {
+        "id": "settings",
+        "x": 80,
+        "y": 720,
+        "w": 110,
+        "h": 80,
+        "action": "go_to_settings"
+      },
+      {
+        "id": "flash",
+        "x": 205,
+        "y": 720,
+        "w": 110,
+        "h": 80,
+        "action": "cycle_flash"
+      },
+      {
+        "id": "gallery",
+        "x": 330,
+        "y": 720,
+        "w": 110,
+        "h": 80,
+        "action": "go_to_gallery"
+      }
+    ]
+  },
+  "settings": {
+    "screen_size": [480, 800],
+    "overlay": "settings.png",
+    "hitboxes": [
+      {
+        "id": "back",
+        "x": 80,
+        "y": 720,
+        "w": 110,
+        "h": 80,
+        "action": "go_to_main"
+      }
+    ]
+  },
+  "gallery": {
+    "screen_size": [480, 800],
+    "overlay": "gallery.png",
+    "hitboxes": [
+      {
+        "id": "back",
+        "x": 80,
+        "y": 720,
+        "w": 110,
+        "h": 80,
+        "action": "go_to_main"
+      }
+    ]
+  }
+}
