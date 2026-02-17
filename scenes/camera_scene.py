@@ -390,7 +390,7 @@ class CameraScene:
         try:
             preview_w, preview_h = 480, 640
 
-            rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
+            rotation_mode = 0
 
             if self._debug_frame_logs:
                 logger.debug(f"[FRAME] Input: {frame.shape} | Rotation mode: {rotation_mode}")
