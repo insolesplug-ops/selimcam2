@@ -460,12 +460,12 @@ class CameraApp:
     def _rotate_touch(self, px: int, py: int) -> tuple:
         """
         Physical landscape coordinates -> logical portrait coordinates.
-        Clockwise mapping:
-            new_x = y
-            new_y = width - x
+        180° flip mapping (from user spec):
+            x_mapped = LOGICAL_W - x_raw
+            y_mapped = LOGICAL_H - y_raw
         """
-        lx = int(py)
-        ly = int(PHYSICAL_W - px)
+        lx = int(LOGICAL_W - px)
+        ly = int(LOGICAL_H - py)
         # Clamp
         lx = max(0, min(LOGICAL_W - 1, lx))
         ly = max(0, min(LOGICAL_H - 1, ly))
@@ -727,6 +727,7 @@ class CameraApp:
                         self.power_manager.update_activity()
                         px, py = event.pos
                         lx, ly = self._rotate_touch(px, py)
+                        logger.debug(f"[TOUCH] Raw: ({px}, {py}) → Mapped: ({lx}, {ly})")
                         rotated_event = pygame.event.Event(
                             pygame.MOUSEBUTTONDOWN,
                             {
@@ -753,6 +754,7 @@ class CameraApp:
                         px = int(event.x * PHYSICAL_W)
                         py = int(event.y * PHYSICAL_H)
                         lx, ly = self._rotate_touch(px, py)
+                        logger.debug(f"[TOUCH] Raw: ({px}, {py}) → Mapped: ({lx}, {ly})")
                         rotated_event = pygame.event.Event(
                             pygame.MOUSEBUTTONDOWN,
                             {
@@ -803,7 +805,7 @@ class CameraApp:
                     # Logger overlay auf logical_surface
                     logger.render_ui(self.logical_surface)
 
-                    rotated = pygame.transform.rotate(self.logical_surface, -90)
+                    rotated = pygame.transform.rotate(self.logical_surface, 180)
                     self.screen.blit(rotated, (0, 0))
 
                     pygame.display.update([pygame.Rect(0, 0, PHYSICAL_W, PHYSICAL_H)])

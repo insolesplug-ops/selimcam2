@@ -7,17 +7,19 @@
     {
       "id": "back",
       "x": 0,
-      "y": 730,
-      "width": 150,
-      "height": 70,
+      "y": 706,
+      "w": 114,
+      "h": 97,
+      "action": "back_to_camera",
       "description": "Back to camera"
     },
     {
       "id": "delete",
       "x": 165,
       "y": 730,
-      "width": 150,
-      "height": 70,
+      "w": 150,
+      "h": 70,
+      "action": "delete_photo",
       "description": "Delete current photo"
     }
   ]

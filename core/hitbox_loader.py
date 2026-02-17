@@ -77,8 +77,8 @@ class HitboxLoader:
         for hitbox in self.hitboxes[filename]:
             hx = hitbox.get('x', 0)
             hy = hitbox.get('y', 0)
-            hw = hitbox.get('width', 0)
-            hh = hitbox.get('height', 0)
+            hw = hitbox.get('w', hitbox.get('width', 0))
+            hh = hitbox.get('h', hitbox.get('height', 0))
             
             if hx <= x < hx + hw and hy <= y < hy + hh:
                 return hitbox.get('id', 'unknown')

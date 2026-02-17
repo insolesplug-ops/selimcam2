@@ -75,7 +75,9 @@ class CameraScene:
     
     def on_exit(self):
         """Stop camera preview."""
-            screen_w, screen_h = self.app.logical_surface.get_size()
+        if self.app.camera:
+            self.app.camera.stop_preview()
+    
     def handle_event(self, event: pygame.event.Event):
         """Handle input events."""
         from core.state_machine import AppEvent
@@ -103,7 +105,7 @@ class CameraScene:
                 logger.info("Opening Settings")
                 self.app.state_machine.handle_event(AppEvent.OPEN_SETTINGS)
                 if self.app.haptic and self.app.haptic.available:
-            screen_w, screen_h = self.app.logical_surface.get_size()
+                    self.app.haptic.tap()
             elif hit_id == 'gallery':
                 logger.info("Opening Gallery")
                 self.app.state_machine.handle_event(AppEvent.OPEN_GALLERY)

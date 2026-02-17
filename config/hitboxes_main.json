@@ -6,27 +6,30 @@
   "hitboxes": [
     {
       "id": "settings",
-      "x": 0,
-      "y": 730,
-      "width": 120,
-      "height": 70,
-      "description": "Settings button (bottom-left)"
+      "x": 248,
+      "y": 735,
+      "w": 73,
+      "h": 48,
+      "action": "open_settings",
+      "description": "Settings button"
     },
     {
       "id": "flash",
-      "x": 180,
-      "y": 730,
-      "width": 120,
-      "height": 70,
-      "description": "Flash mode toggle (bottom-center)"
+      "x": 321,
+      "y": 735,
+      "w": 73,
+      "h": 48,
+      "action": "toggle_flash",
+      "description": "Flash mode toggle"
     },
     {
       "id": "gallery",
-      "x": 360,
-      "y": 730,
-      "width": 120,
-      "height": 70,
-      "description": "Gallery button (bottom-right)"
+      "x": 387,
+      "y": 735,
+      "w": 73,
+      "h": 48,
+      "action": "open_gallery",
+      "description": "Gallery button"
     }
   ]
 }
