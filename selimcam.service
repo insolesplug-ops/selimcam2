@@ -7,12 +7,12 @@ Wants=network.target
 Type=simple
 User=pi
 Group=pi
-WorkingDirectory=/home/pi/FINALMAINCAMMM
+WorkingDirectory=/home/pi/selimcam2
 Environment="PYTHONUNBUFFERED=1"
 Environment="SDL_VIDEODRIVER=kmsdrm"
 Environment="SDL_VIDEO_KMSDRM_ROTATION=270"
 Environment="SDL_FBDEV_ROTATION=270"
-ExecStart=/bin/bash /home/pi/FINALMAINCAMMM/start_camera.sh
+ExecStart=/bin/bash /home/pi/selimcam2/start_camera.sh
 Restart=always
 RestartSec=5
 StandardOutput=journal

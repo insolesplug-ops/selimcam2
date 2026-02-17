@@ -4,19 +4,47 @@ CameraBackend - REAL HARDWARE
 Pi 3A+ Optimiert
 """
 import time
+import sys
 import logging
 import numpy as np
 import threading
+from pathlib import Path
 from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-try:
-    from picamera2 import Picamera2
-    _PICAMERA2_IMPORT_ERROR = None
-except Exception as exc:
-    Picamera2 = None
-    _PICAMERA2_IMPORT_ERROR = exc
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _import_picamera2_safely():
+    removed_path = None
+    removed_module = None
+
+    project_root_str = str(_PROJECT_ROOT)
+    if project_root_str in sys.path:
+        sys.path.remove(project_root_str)
+        removed_path = project_root_str
+
+    existing_libcamera = sys.modules.get("libcamera")
+    if existing_libcamera is not None:
+        module_file = getattr(existing_libcamera, "__file__", "") or ""
+        if module_file.startswith(project_root_str):
+            removed_module = existing_libcamera
+            del sys.modules["libcamera"]
+
+    try:
+        from picamera2 import Picamera2 as _Picamera2
+        return _Picamera2, None
+    except Exception as exc:
+        return None, exc
+    finally:
+        if removed_path is not None:
+            sys.path.insert(0, removed_path)
+        if removed_module is not None and "libcamera" not in sys.modules:
+            sys.modules["libcamera"] = removed_module
+
+
+Picamera2, _PICAMERA2_IMPORT_ERROR = _import_picamera2_safely()
 
 
 class CameraBackend:

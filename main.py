@@ -21,6 +21,14 @@ try:
 except ImportError:
     psutil = None
 
+APP_ROOT = Path(__file__).resolve().parent
+os.chdir(APP_ROOT)
+HEALTH_FILE = Path("/home/pi/camera_app_data/selimcam_health.json")
+
+if not os.environ.get("XDG_RUNTIME_DIR"):
+    fallback_runtime = f"/run/user/{os.getuid()}"
+    os.environ["XDG_RUNTIME_DIR"] = fallback_runtime if os.path.isdir(fallback_runtime) else "/tmp"
+
 # ============================================================
 # PLATFORM - HARDCODED PI MODE
 # ============================================================
@@ -54,7 +62,7 @@ from core.logger import logger
 # HITBOX SYSTEM
 # ============================================================
 
-HITBOXES_FILE = Path("hitboxes_ui.json")
+HITBOXES_FILE = APP_ROOT / "hitboxes_ui.json"
 
 
 class Hitbox:
@@ -360,6 +368,14 @@ class CameraApp:
         self.perf_monitor = PerformanceMonitor()
         pygame.init()
         pygame.mouse.set_visible(False)
+        pygame.event.set_allowed(None)
+        pygame.event.set_allowed([
+            pygame.QUIT,
+            pygame.MOUSEBUTTONDOWN,
+            pygame.FINGERDOWN,
+            pygame.KEYDOWN,
+            pygame.KEYUP,
+        ])
         self.config = ConfigManager()
 
         # Natives Portrait-Fenster (KMS-Rotation außerhalb der App)
@@ -377,7 +393,7 @@ class CameraApp:
         self.target_fps = self.config.get('camera', 'preview_fps', default=24)
         self.running = True
 
-        self.resource_manager = ResourceManager("assets")
+        self.resource_manager = ResourceManager(str(APP_ROOT / "assets"))
         self.resource_manager.preload_all()
 
         photos_dir = self.config.get('storage', 'photos_dir',
@@ -396,6 +412,12 @@ class CameraApp:
         self.sensor_thread.start()
         self.last_standby_check = time.time()
         self.last_perf_print = time.time()
+        self.last_health_write = 0.0
+        self.health_file = HEALTH_FILE
+        try:
+            self.health_file.parent.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
 
         signal.signal(signal.SIGINT,  self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -404,6 +426,27 @@ class CameraApp:
         mem = self.perf_monitor.get_memory_usage_mb()
         if mem > 0:
             logger.info(f"Memory: {mem:.1f}MB")
+        self._write_health_status("starting")
+
+    def _write_health_status(self, status: str):
+        now = time.time()
+        payload = {
+            "timestamp": now,
+            "pid": os.getpid(),
+            "status": status,
+            "fps": round(self.perf_monitor.avg_fps, 2),
+            "frame_ms": round(self.perf_monitor.avg_frame_time, 2),
+            "memory_mb": round(self.perf_monitor.get_memory_usage_mb(), 2),
+            "state": self.state_machine.current_state.value if hasattr(self, 'state_machine') else "unknown",
+        }
+        temp_file = self.health_file.with_suffix(".tmp")
+        try:
+            with open(temp_file, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, separators=(",", ":"))
+            os.replace(temp_file, self.health_file)
+            self.last_health_write = now
+        except Exception:
+            pass
 
     # ── TOUCH KOORDINATEN (PORTRAIT) ────────────────────────────────
     def _rotate_touch(self, px: int, py: int) -> tuple:
@@ -744,12 +787,16 @@ class CameraApp:
                     self.perf_monitor.print_stats()
                     self.last_perf_print = now
 
+                if now - self.last_health_write >= 5.0:
+                    self._write_health_status("running")
+
         except KeyboardInterrupt:
             logger.info("Interrupted by user")
         except Exception as e:
             logger.critical(f"Fatal error: {e}")
             traceback.print_exc()
         finally:
+            self._write_health_status("stopping")
             self.cleanup()
 
     def _execute_shutdown(self):
