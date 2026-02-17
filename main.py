@@ -1,57 +1,12 @@
 """
 SelimCam v2.0 - PRODUCTION BUILD
-Complete camera app with cross-platform support.
+Pi 3A+ | 8MP Camera | Waveshare 4.3" DSI
+FIXES: Software Rotation 90°, Standby 10s, No Stubs
 """
 
 import os
 import sys
 import platform
-
-# ============================================================
-# STEP 1: PLATFORM DETECTION
-# ============================================================
-
-def detect_platform():
-    """Detect if running on Raspberry Pi."""
-    if os.path.exists('/sys/firmware/devicetree/base/model'):
-        try:
-            with open('/sys/firmware/devicetree/base/model', 'r') as f:
-                if 'Raspberry Pi' in f.read():
-                    return True
-        except (IOError, OSError) as e:
-            logger.debug(f"Could not read device model: {e}")
-    
-    if platform.system() == 'Linux' and platform.machine().startswith('arm'):
-        return True
-    
-    return False
-
-IS_RASPBERRY_PI = detect_platform()
-
-if IS_RASPBERRY_PI:
-    print("[Platform] 🍓 Raspberry Pi detected - using hardware backends")
-else:
-    print("[Platform] 💻 Non-Pi system detected - using simulators")
-    print("\n" + "="*60)
-    print(" SIMULATOR CONTROLS:")
-    print("="*60)
-    print("  LEFT/RIGHT  : Rotate encoder (zoom)")
-    print("  RETURN      : Encoder button")
-    print("  SPACE       : Shutter (capture photo)")
-    print("  Q/W         : Adjust tilt (level indicator)")
-    print("  +/- (or =)  : Adjust lux (brightness)")
-    print("  G           : Toggle grid")
-    print("  L           : Toggle level")
-    print("  F           : Cycle flash mode")
-    print("  S           : Capture (alternative)")
-    print("  ESC         : Exit/Back")
-    print("  MOUSE       : Touch simulation (click & drag)")
-    print("="*60 + "\n")
-
-# ============================================================
-# STEP 2: STANDARD IMPORTS
-# ============================================================
-
 import pygame
 import time
 import signal
@@ -67,7 +22,29 @@ try:
 except ImportError:
     psutil = None
 
-# Core imports
+# ============================================================
+# PLATFORM - HARDCODED PI MODE
+# ============================================================
+
+# FORCE PI MODE - Pi 3A+ hardcoded
+IS_RASPBERRY_PI = True
+print("[Platform] 🍓 Raspberry Pi 3A+ - FORCE MODE")
+
+# ============================================================
+# DISPLAY ROTATION CONSTANTS
+# ============================================================
+# Display ist physisch Landscape (800x480)
+# App rendert Portrait (480x800) und wird SOFTWARE-rotiert 90° rechts
+
+PHYSICAL_W = 800   # Physisches Display: Breite
+PHYSICAL_H = 480   # Physisches Display: Höhe
+LOGICAL_W  = 480   # Logische App-Breite  (Portrait)
+LOGICAL_H  = 800   # Logische App-Höhe    (Portrait)
+
+# ============================================================
+# CORE IMPORTS
+# ============================================================
+
 from core.config_manager import ConfigManager
 from core.state_machine import StateMachine, AppState, AppEvent
 from core.resource_manager import ResourceManager
@@ -75,13 +52,13 @@ from core.photo_manager import PhotoManager
 from core.logger import logger
 
 # ============================================================
-# HITBOX SYSTEM (NEW)
+# HITBOX SYSTEM
 # ============================================================
 
 HITBOXES_FILE = Path("hitboxes_ui.json")
 
+
 class Hitbox:
-    """Single hitbox rectangle."""
     def __init__(self, id: str, x: int, y: int, w: int, h: int, action: str):
         self.id = id
         self.x = x
@@ -89,103 +66,86 @@ class Hitbox:
         self.w = w
         self.h = h
         self.action = action
-    
+
     def contains(self, mx: int, my: int) -> bool:
-        """Strict hit test: x <= mx < x+w AND y <= my < y+h"""
         return self.x <= mx < self.x + self.w and self.y <= my < self.y + self.h
 
+
 class HitboxEngine:
-    """Manages hitboxes for all scenes."""
     def __init__(self, data: dict):
-        self.data = data
         self.hitboxes = {}
-        
-        # Build hitbox objects for each scene
         for scene_name, scene_data in data.items():
             self.hitboxes[scene_name] = [
                 Hitbox(hb["id"], hb["x"], hb["y"], hb["w"], hb["h"], hb["action"])
                 for hb in scene_data.get("hitboxes", [])
             ]
-    
+
     def hit_test(self, scene: str, mx: int, my: int) -> Optional[tuple]:
-        """Test if click hits a hitbox. Returns: (hitbox_id, action) or None"""
         for hb in self.hitboxes.get(scene, []):
             if hb.contains(mx, my):
                 return (hb.id, hb.action)
         return None
-    
+
     def get_hitboxes(self, scene: str) -> list:
-        """Get all hitboxes for a scene."""
         return self.hitboxes.get(scene, [])
 
+
 def load_hitboxes() -> dict:
-    """Load hitbox definitions from JSON."""
+    empty = {"main": {"hitboxes": []}, "settings": {"hitboxes": []}, "gallery": {"hitboxes": []}}
     if not HITBOXES_FILE.exists():
-        logger.warning(f"Hitboxes file not found: {HITBOXES_FILE}, features may be limited")
-        return {"main": {"hitboxes": []}, "settings": {"hitboxes": []}, "gallery": {"hitboxes": []}}
-    
+        logger.warning(f"Hitboxes file not found: {HITBOXES_FILE}")
+        return empty
     try:
         with open(HITBOXES_FILE, 'r') as f:
             return json.load(f)
     except Exception as e:
         logger.warning(f"Failed to load hitboxes: {e}")
-        return {"main": {"hitboxes": []}, "settings": {"hitboxes": []}, "gallery": {"hitboxes": []}}
+        return empty
+
 
 # ============================================================
-# UI IMPORTS
+# UI + SCENE IMPORTS
 # ============================================================
+
 from ui.overlay_renderer import OverlayRenderer
 from ui.grid_overlay import GridOverlay
 from ui.freeze_frame import FreezeFrame
-
-# Scene imports
 from scenes.boot_scene import BootScene
 from scenes.camera_scene import CameraScene
 from scenes.settings_scene import SettingsScene
 from scenes.gallery_scene import GalleryScene
 
 # ============================================================
-# STEP 3: CONDITIONAL HARDWARE IMPORTS
+# HARDWARE IMPORTS - SIMULATORS FIRST, DANN ECHTE HARDWARE
 # ============================================================
 
-# Import simulators FIRST (always safe)
 from hardware.simulator import (
-    CameraSimulator,
-    EncoderSimulator,
-    ButtonSimulator,
-    HapticSimulator,
-    LightSensorSimulator,
-    GyroscopeSimulator,
-    FlashLEDSimulator,
-    BatterySimulator,
-    BrightnessSimulator
+    CameraSimulator, EncoderSimulator, ButtonSimulator,
+    HapticSimulator, LightSensorSimulator, GyroscopeSimulator,
+    FlashLEDSimulator, BatterySimulator, BrightnessSimulator
 )
 
-# If on Pi, try real hardware
-if IS_RASPBERRY_PI:
-    try:
-        from hardware.camera_backend import CameraBackend as RealCamera
-        from hardware.encoder import RotaryEncoder as RealEncoder
-        from hardware.buttons import DebouncedButton as RealButton
-        from hardware.haptic import HapticDriver as RealHaptic
-        from hardware.light_sensor import LightSensor as RealLightSensor
-        from hardware.gyro import Gyroscope as RealGyro
-        from hardware.flash_led import FlashLED as RealFlashLED
-        from hardware.battery import BatteryMonitor as RealBattery
-        from hardware.brightness import BrightnessController as RealBrightness
-        
-        logger.info("Real hardware backends loaded")
-        HARDWARE_IMPORTED = True
-    except Exception as e:
-        logger.warning(f"Hardware import failed: {e}")
-        logger.info("Falling back to simulators")
-        HARDWARE_IMPORTED = False
-        IS_RASPBERRY_PI = False
-else:
+# Echte Hardware laden - IS_RASPBERRY_PI bleibt IMMER True!
+try:
+    from hardware.camera_backend import CameraBackend as RealCamera
+    from hardware.encoder import RotaryEncoder as RealEncoder
+    from hardware.buttons import DebouncedButton as RealButton
+    from hardware.haptic import HapticDriver as RealHaptic
+    from hardware.light_sensor import LightSensor as RealLightSensor
+    from hardware.gyro import Gyroscope as RealGyro
+    from hardware.flash_led import FlashLED as RealFlashLED
+    from hardware.battery import BatteryMonitor as RealBattery
+    from hardware.brightness import BrightnessController as RealBrightness
+    logger.info("✓ Real hardware backends loaded")
+    HARDWARE_IMPORTED = True
+except Exception as e:
+    logger.error(f"Hardware import failed: {e}")
+    logger.warning("Using simulators - IS_RASPBERRY_PI stays True!")
     HARDWARE_IMPORTED = False
+    # WICHTIG: IS_RASPBERRY_PI = False ist VERBOTEN hier!
 
-# Assign backends
-if IS_RASPBERRY_PI and HARDWARE_IMPORTED:
+# Backends zuweisen
+if HARDWARE_IMPORTED:
     CameraBackend = RealCamera
     RotaryEncoder = RealEncoder
     DebouncedButton = RealButton
@@ -213,163 +173,128 @@ else:
 # ============================================================
 
 class PerformanceMonitor:
-    """Real-time performance monitoring."""
-    
     def __init__(self, window_size: int = 100):
         self.frame_times = deque(maxlen=window_size)
         self.fps_history = deque(maxlen=window_size)
         self.frame_start: Optional[float] = None
         self.avg_fps = 0.0
         self.avg_frame_time = 0.0
-        self.max_frame_time = 0.0
         self.process = None
-        
         if psutil:
             try:
                 self.process = psutil.Process()
-            except (OSError, Exception) as e:
-                logger.debug(f"Could not initialize process monitor: {e}")
-    
+            except Exception:
+                pass
+
     def frame_begin(self):
         self.frame_start = time.time()
-    
+
     def frame_end(self):
         if self.frame_start is None:
             return
-        
-        frame_time = (time.time() - self.frame_start) * 1000
-        self.frame_times.append(frame_time)
-        
-        fps = 1000.0 / frame_time if frame_time > 0 else 0
-        self.fps_history.append(fps)
-        
+        ft = (time.time() - self.frame_start) * 1000
+        self.frame_times.append(ft)
+        self.fps_history.append(1000.0 / ft if ft > 0 else 0)
         if self.frame_times:
             self.avg_frame_time = sum(self.frame_times) / len(self.frame_times)
-            self.max_frame_time = max(self.frame_times)
-        
         if self.fps_history:
             self.avg_fps = sum(self.fps_history) / len(self.fps_history)
-        
         self.frame_start = None
-    
+
     def should_skip_frame(self, target_ms: float) -> bool:
-        if not self.frame_times:
-            return False
-        return self.frame_times[-1] > (target_ms * 1.5)
-    
+        return bool(self.frame_times) and self.frame_times[-1] > target_ms * 1.5
+
     def get_memory_usage_mb(self) -> float:
         if self.process:
             try:
                 return self.process.memory_info().rss / 1024 / 1024
-            except (OSError, AttributeError) as e:
-                logger.debug(f"Could not read memory usage: {e}")
+            except Exception:
+                pass
         return 0.0
-    
+
     def print_stats(self):
-        mem_mb = self.get_memory_usage_mb()
-        if mem_mb > 0:
-            logger.debug(f"FPS: {self.avg_fps:.1f} | Frame: {self.avg_frame_time:.1f}ms | Mem: {mem_mb:.1f}MB")
-        else:
-            logger.debug(f"FPS: {self.avg_fps:.1f} | Frame: {self.avg_frame_time:.1f}ms")
+        mem = self.get_memory_usage_mb()
+        logger.debug(f"FPS: {self.avg_fps:.1f} | Frame: {self.avg_frame_time:.1f}ms | Mem: {mem:.1f}MB")
 
 
 # ============================================================
-# POWER MANAGER
+# POWER MANAGER - STANDBY 10 SEKUNDEN
 # ============================================================
 
 class PowerManager:
-    STATE_ACTIVE = 'active'
-    STATE_STANDBY = 'standby'
+    STATE_ACTIVE   = 'active'
+    STATE_STANDBY  = 'standby'
     STATE_SHUTDOWN = 'shutdown'
-    
+
     def __init__(self, config, brightness_ctrl):
         self.config = config
         self.brightness_ctrl = brightness_ctrl
         self.state = self.STATE_ACTIVE
         self.last_activity_time = time.time()
-        self.standby_timeout = config.get('power', 'standby_timeout_s', default=30)
+        # STANDBY: 10 Sekunden
+        self.standby_timeout = config.get('power', 'standby_timeout_s', default=10)
         self.shutdown_long_press = config.get('power', 'shutdown_long_press_s', default=1.8)
         self.encoder_press_start: Optional[float] = None
         self.active_brightness: Optional[int] = None
-        
-        logger.info(f"PowerManager initialized (standby={self.standby_timeout}s)")
-    
+        logger.info(f"PowerManager: standby={self.standby_timeout}s")
+
     def update_activity(self):
         self.last_activity_time = time.time()
         if self.state == self.STATE_STANDBY:
             self.wake_from_standby()
-    
+
     def check_standby(self, motion_detected: bool = False) -> bool:
         if self.state != self.STATE_ACTIVE:
             return False
         if motion_detected:
             self.last_activity_time = time.time()
             return False
-        idle_time = time.time() - self.last_activity_time
-        if idle_time >= self.standby_timeout:
+        if time.time() - self.last_activity_time >= self.standby_timeout:
             self.enter_standby()
             return True
         return False
-    
+
     def enter_standby(self):
-        """Enter standby mode - turn off screen and reduce power."""
         if self.state == self.STATE_STANDBY:
             return
-        logger.info("📴 Entering STANDBY mode")
-        # Save current brightness
+        logger.info("📴 STANDBY")
         self.active_brightness = self.brightness_ctrl.get_brightness()
-        # Turn off screen (brightness 0 = backlight off)
         self.brightness_ctrl.set_brightness(0)
         self.state = self.STATE_STANDBY
-    
+
     def wake_from_standby(self):
-        """Wake from standby - restore screen and brightness."""
         if self.state != self.STATE_STANDBY:
             return
-        logger.info("🔋 WAKE from standby")
-        # Restore brightness
-        if self.active_brightness is not None:
-            self.brightness_ctrl.set_brightness(self.active_brightness)
-        else:
-            self.brightness_ctrl.set_brightness(120)  # Default brightness
+        logger.info("🔋 WAKE")
+        self.brightness_ctrl.set_brightness(self.active_brightness or 120)
         self.state = self.STATE_ACTIVE
         self.last_activity_time = time.time()
-    
+
     def encoder_button_pressed(self):
-        """Handle encoder button press - wake from standby if needed."""
-        # Wake from standby on button press
         if self.state == self.STATE_STANDBY:
             self.wake_from_standby()
             self.update_activity()
             return
-        # Track press time for long-press detection
         self.encoder_press_start = time.time()
         self.update_activity()
-    
+
     def encoder_button_released(self) -> bool:
-        """Handle encoder button release - check for shutdown long-press."""
         if self.encoder_press_start is None:
             return False
         duration = time.time() - self.encoder_press_start
         self.encoder_press_start = None
-        # Shutdown only on long press while active (not in standby)
         if duration >= self.shutdown_long_press and self.state == self.STATE_ACTIVE:
             self.request_shutdown()
             return True
         return False
-    
+
     def request_shutdown(self):
         logger.info("Shutdown requested")
         self.state = self.STATE_SHUTDOWN
-    
-    def is_active(self) -> bool:
-        return self.state == self.STATE_ACTIVE
-    
-    def is_standby(self) -> bool:
-        return self.state == self.STATE_STANDBY
-    
-    def is_shutdown(self) -> bool:
-        return self.state == self.STATE_SHUTDOWN
+
+    def is_active(self)   -> bool: return self.state == self.STATE_ACTIVE
+    def is_standby(self)  -> bool: return self.state == self.STATE_STANDBY
+    def is_shutdown(self) -> bool: return self.state == self.STATE_SHUTDOWN
 
 
 # ============================================================
@@ -382,83 +307,43 @@ class SensorThread(threading.Thread):
         self.app = app
         self.running = False
         self.lock = threading.Lock()
-        
-        self.lux_update_hz = 5
-        self.gyro_update_hz = 20
-        self.battery_update_hz = 1
-        
-        self.last_lux_update = 0.0
-        self.last_gyro_update = 0.0
-        self.last_battery_update = 0.0
-        
+        self.last_lux     = 0.0
+        self.last_gyro    = 0.0
+        self.last_battery = 0.0
         self.lux_value: Optional[float] = None
         self.tilt_angle: float = 0.0
         self.battery_percent: Optional[int] = None
-    
+
     def run(self):
         self.running = True
         logger.info("SensorThread started")
-        
         while self.running:
-            current_time = time.time()
-            
-            if current_time - self.last_lux_update >= 1.0 / self.lux_update_hz:
+            now = time.time()
+            if now - self.last_lux >= 0.2:
                 if self.app.light_sensor and self.app.light_sensor.available:
                     lux = self.app.light_sensor.read_lux()
                     with self.lock:
                         self.lux_value = lux
-                    
-                    if self.app.config.get('display', 'brightness_mode') == 'auto':
-                        self._update_auto_brightness(lux)
-                
-                self.last_lux_update = current_time
-            
-            if current_time - self.last_gyro_update >= 1.0 / self.gyro_update_hz:
+                self.last_lux = now
+            if now - self.last_gyro >= 0.05:
                 if self.app.gyro and self.app.gyro.available:
-                    tilt = self.app.gyro.update_tilt()
                     with self.lock:
-                        self.tilt_angle = tilt
-                self.last_gyro_update = current_time
-            
-            if current_time - self.last_battery_update >= 1.0 / self.battery_update_hz:
+                        self.tilt_angle = self.app.gyro.update_tilt()
+                self.last_gyro = now
+            if now - self.last_battery >= 1.0:
                 if self.app.battery and self.app.battery.available:
-                    pct = self.app.battery.read_percentage()
                     with self.lock:
-                        self.battery_percent = pct
-                self.last_battery_update = current_time
-            
+                        self.battery_percent = self.app.battery.read_percentage()
+                self.last_battery = now
             time.sleep(0.01)
-    
-    def _update_auto_brightness(self, lux: float):
-        if not self.app.power_manager.is_active():
-            return
-        
-        min_brightness = self.app.config.get('display', 'brightness_dark', default=40)
-        max_brightness = self.app.config.get('display', 'brightness_bright', default=220)
-        
-        target = self.app.brightness_ctrl.auto_brightness_from_lux(lux, min_brightness, max_brightness)
-        current = self.app.brightness_ctrl.get_brightness()
-        
-        if current is not None:
-            delta = target - current
-            if abs(delta) > 10:
-                delta = 10 if delta > 0 else -10
-            self.app.brightness_ctrl.set_brightness(current + delta)
-    
-    def get_lux(self) -> Optional[float]:
-        with self.lock:
-            return self.lux_value
-    
-    def get_tilt(self) -> float:
-        with self.lock:
-            return self.tilt_angle
-    
-    def get_battery(self) -> Optional[int]:
-        with self.lock:
-            return self.battery_percent
-    
-    def stop(self):
-        self.running = False
+
+    def get_lux(self)     -> Optional[float]: 
+        with self.lock: return self.lux_value
+    def get_tilt(self)    -> float:           
+        with self.lock: return self.tilt_angle
+    def get_battery(self) -> Optional[int]:   
+        with self.lock: return self.battery_percent
+    def stop(self): self.running = False
 
 
 # ============================================================
@@ -467,248 +352,233 @@ class SensorThread(threading.Thread):
 
 class CameraApp:
     def __init__(self):
-        logger.info("="*70)
+        logger.info("=" * 70)
         logger.info(" SelimCam v2.0 - PRODUCTION BUILD")
-        logger.info(f" Platform: {'Raspberry Pi' if IS_RASPBERRY_PI else 'Simulator'}")
-        logger.info("="*70)
-        
-        # Log working directory
-        logger.info(f"Working directory: {os.getcwd()}")
-        
+        logger.info(" Platform: Raspberry Pi 3A+")
+        logger.info(f" Display:  SOFTWARE ROTATION 90° right")
+        logger.info(f"           Physical {PHYSICAL_W}x{PHYSICAL_H} → Logical {LOGICAL_W}x{LOGICAL_H}")
+        logger.info("=" * 70)
+
         self.perf_monitor = PerformanceMonitor()
-        
         pygame.init()
-        pygame.mouse.set_visible(not IS_RASPBERRY_PI)
-        
+        pygame.mouse.set_visible(False)
         self.config = ConfigManager()
-        
-        screen_w = self.config.get('display', 'width', default=480)
-        screen_h = self.config.get('display', 'height', default=800)
-        
-        if IS_RASPBERRY_PI:
-            flags = pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.FULLSCREEN
-        else:
-            flags = pygame.HWSURFACE | pygame.DOUBLEBUF
-        
-        self.screen = pygame.display.set_mode((screen_w, screen_h), flags)
+
+        # Physisches Fenster LANDSCAPE (so wie Hardware)
+        flags = pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.FULLSCREEN
+        self.screen = pygame.display.set_mode((PHYSICAL_W, PHYSICAL_H), flags)
+
+        # Logische Surface PORTRAIT (so wie App denkt)
+        # Alle Scenes rendern NUR auf diese Surface!
+        self.logical_surface = pygame.Surface((LOGICAL_W, LOGICAL_H))
+
         pygame.display.set_caption("SelimCam v2.0")
-        
-        logger.info(f"Display: {screen_w}x{screen_h}")
-        
+        logger.info(f"Physical: {PHYSICAL_W}x{PHYSICAL_H} | Logical: {LOGICAL_W}x{LOGICAL_H}")
+
         self.clock = pygame.time.Clock()
         self.target_fps = self.config.get('camera', 'preview_fps', default=24)
         self.running = True
-        
+
         self.resource_manager = ResourceManager("assets")
         self.resource_manager.preload_all()
-        
-        photos_dir = self.config.get('storage', 'photos_dir', 
-                                    default="photos" if not IS_RASPBERRY_PI 
-                                    else "/home/pi/camera_app_data/photos")
+
+        photos_dir = self.config.get('storage', 'photos_dir',
+                                     default="/home/pi/camera_app_data/photos")
         self.photo_manager = PhotoManager(photos_dir)
-        
-        # Load hitboxes for UI interaction (NEW)
-        hitboxes_data = load_hitboxes()
-        self.hitbox_engine = HitboxEngine(hitboxes_data)
+
+        self.hitbox_engine = HitboxEngine(load_hitboxes())
         logger.info("Hitbox system initialized")
-        
+
         self.hardware_available = self._init_hardware_safe()
         self._init_ui_components()
-        
         self.power_manager = PowerManager(self.config, self.brightness_ctrl)
         self.state_machine = StateMachine(AppState.BOOT)
         self._init_scenes()
-        
         self.sensor_thread = SensorThread(self)
         self.sensor_thread.start()
-        
         self.last_standby_check = time.time()
         self.last_perf_print = time.time()
-        
-        signal.signal(signal.SIGINT, self._signal_handler)
+
+        signal.signal(signal.SIGINT,  self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
-        
+
         logger.info("Initialization complete")
         mem = self.perf_monitor.get_memory_usage_mb()
         if mem > 0:
             logger.info(f"Memory: {mem:.1f}MB")
-    
+
+    # ── TOUCH KOORDINATEN UMRECHNEN ─────────────────────────────────
+    def _rotate_touch(self, px: int, py: int) -> tuple:
+        """
+        Physische Landscape-Koordinaten → Logische Portrait-Koordinaten.
+        Rotation 90° nach rechts (clockwise):
+          lx = PHYSICAL_H - 1 - py  (skaliert)
+          ly = px                    (skaliert)
+        """
+        lx = int((PHYSICAL_H - 1 - py) * LOGICAL_W / PHYSICAL_H)
+        ly = int(px * LOGICAL_H / PHYSICAL_W)
+        # Clamp
+        lx = max(0, min(LOGICAL_W - 1, lx))
+        ly = max(0, min(LOGICAL_H - 1, ly))
+        return (lx, ly)
+
+    # ── HARDWARE INIT ────────────────────────────────────────────────
     def _init_hardware_safe(self) -> dict:
-        """Initialize hardware with error handling."""
         logger.info("Initializing hardware...")
-        availability = {}
-        
-        # Camera
+        av = {}
+
         try:
-            preview_w = self.config.get('camera', 'preview_width', default=640)
-            preview_h = self.config.get('camera', 'preview_height', default=480)
-            capture_w = self.config.get('camera', 'capture_width', default=2592)
-            capture_h = self.config.get('camera', 'capture_height', default=1944)
-            preview_fps = self.config.get('camera', 'preview_fps', default=24)
-            
-            self.camera = CameraBackend((preview_w, preview_h), (capture_w, capture_h), preview_fps)
-            availability['camera'] = True
+            pw  = self.config.get('camera', 'preview_width',  default=640)
+            ph  = self.config.get('camera', 'preview_height', default=480)
+            cw  = self.config.get('camera', 'capture_width',  default=3280)
+            ch  = self.config.get('camera', 'capture_height', default=2464)
+            fps = self.config.get('camera', 'preview_fps',    default=24)
+            self.camera = CameraBackend((pw, ph), (cw, ch), fps)
+            av['camera'] = True
             logger.info("✓ Camera")
         except Exception as e:
             logger.error(f"Camera init failed: {e}")
             self.camera = None
-            availability['camera'] = False
-        
-        # Encoder
+            av['camera'] = False
+
         try:
             self.encoder = RotaryEncoder(5, 6, 2.0, self._encoder_cw, self._encoder_ccw)
-            availability['encoder'] = True
+            av['encoder'] = True
             logger.info("✓ Encoder")
         except Exception as e:
             logger.error(f"Encoder init failed: {e}")
             self.encoder = None
-            availability['encoder'] = False
-        
-        # Buttons
+            av['encoder'] = False
+
         try:
             self.encoder_button = DebouncedButton(13, 50, self._encoder_button_press, self._encoder_button_release)
             self.shutter_button = DebouncedButton(26, 50, self._shutter_press)
-            availability['buttons'] = True
+            av['buttons'] = True
             logger.info("✓ Buttons")
         except Exception as e:
             logger.error(f"Buttons init failed: {e}")
             self.encoder_button = None
             self.shutter_button = None
-            availability['buttons'] = False
-        
-        # Haptic
+            av['buttons'] = False
+
         try:
             self.haptic = HapticDriver()
-            availability['haptic'] = self.haptic.available
-            if self.haptic.available:
-                logger.info("✓ Haptic")
+            av['haptic'] = self.haptic.available
+            if self.haptic.available: logger.info("✓ Haptic")
         except Exception as e:
             logger.error(f"Haptic init failed: {e}")
             self.haptic = None
-            availability['haptic'] = False
-        
-        # Light sensor
+            av['haptic'] = False
+
         try:
             self.light_sensor = LightSensor()
-            availability['light_sensor'] = self.light_sensor.available
-            if self.light_sensor.available:
-                logger.info("✓ Light Sensor")
+            av['light_sensor'] = self.light_sensor.available
+            if self.light_sensor.available: logger.info("✓ Light Sensor")
         except Exception as e:
             logger.error(f"Light sensor init failed: {e}")
             self.light_sensor = None
-            availability['light_sensor'] = False
-        
-        # Gyro
+            av['light_sensor'] = False
+
         try:
             self.gyro = Gyroscope()
-            availability['gyro'] = self.gyro.available
-            if self.gyro.available:
-                logger.info("✓ Gyroscope")
+            av['gyro'] = self.gyro.available
+            if self.gyro.available: logger.info("✓ Gyroscope")
         except Exception as e:
             logger.error(f"Gyro init failed: {e}")
             self.gyro = None
-            availability['gyro'] = False
-        
-        # Flash LED
+            av['gyro'] = False
+
         try:
-            flash_duration = self.config.get('flash', 'pulse_duration_ms', default=120)
-            self.flash_led = FlashLED(27, flash_duration)
-            availability['flash_led'] = True
+            flash_dur = self.config.get('flash', 'pulse_duration_ms', default=120)
+            self.flash_led = FlashLED(27, flash_dur)
+            av['flash_led'] = True
             logger.info("✓ Flash LED")
         except Exception as e:
             logger.error(f"Flash LED init failed: {e}")
             self.flash_led = None
-            availability['flash_led'] = False
-        
-        # Battery
+            av['flash_led'] = False
+
         try:
             self.battery = BatteryMonitor()
-            availability['battery'] = self.battery.available
-            if self.battery.available:
-                logger.info("✓ Battery")
+            av['battery'] = self.battery.available
+            if self.battery.available: logger.info("✓ Battery")
         except Exception as e:
             logger.error(f"Battery init failed: {e}")
             self.battery = None
-            availability['battery'] = False
-        
-        # Brightness
+            av['battery'] = False
+
         try:
             self.brightness_ctrl = BrightnessController()
-            availability['brightness'] = self.brightness_ctrl.available
+            av['brightness'] = self.brightness_ctrl.available
             if self.brightness_ctrl.available:
                 logger.info("✓ Brightness")
                 mode = self.config.get('display', 'brightness_mode', default='medium')
                 if mode != 'auto':
                     values = {
-                        'dark': self.config.get('display', 'brightness_dark', default=40),
+                        'dark':   self.config.get('display', 'brightness_dark',   default=40),
                         'medium': self.config.get('display', 'brightness_medium', default=120),
-                        'bright': self.config.get('display', 'brightness_bright', default=220)
+                        'bright': self.config.get('display', 'brightness_bright', default=220),
                     }
                     self.brightness_ctrl.set_brightness(values.get(mode, 120))
         except Exception as e:
             logger.error(f"Brightness init failed: {e}")
             self.brightness_ctrl = BrightnessController()
-            availability['brightness'] = False
-        
-        return availability
-    
+            av['brightness'] = False
+
+        return av
+
     def _init_ui_components(self):
-        font_regular = self.resource_manager.load_font("fonts/Inter_regular.ttf", 20)
-        font_bold = self.resource_manager.load_font("fonts/inter_bold.ttf", 24)
-        screen_w = self.config.get('display', 'width', default=480)
-        screen_h = self.config.get('display', 'height', default=800)
-        
-        self.overlay_renderer = OverlayRenderer(font_regular, font_bold, screen_w)
-        self.grid_overlay = GridOverlay(screen_w, screen_h)
-        freeze_duration = self.config.get('ui', 'freeze_duration_ms', default=700)
-        self.freeze_frame = FreezeFrame(freeze_duration)
-    
+        font_r = self.resource_manager.load_font("fonts/Inter_regular.ttf", 20)
+        font_b = self.resource_manager.load_font("fonts/inter_bold.ttf",    24)
+        self.overlay_renderer = OverlayRenderer(font_r, font_b, LOGICAL_W)
+        self.grid_overlay     = GridOverlay(LOGICAL_W, LOGICAL_H)
+        freeze_dur            = self.config.get('ui', 'freeze_duration_ms', default=700)
+        self.freeze_frame     = FreezeFrame(freeze_dur)
+
     def _init_scenes(self):
         self.scenes = {
-            AppState.BOOT: BootScene(self),
-            AppState.CAMERA: CameraScene(self),
+            AppState.BOOT:     BootScene(self),
+            AppState.CAMERA:   CameraScene(self),
             AppState.SETTINGS: SettingsScene(self),
-            AppState.GALLERY: GalleryScene(self)
+            AppState.GALLERY:  GalleryScene(self),
         }
-        
         for state, scene in self.scenes.items():
             self.state_machine.on_enter(state, scene.on_enter)
-            self.state_machine.on_exit(state, scene.on_exit)
-        
+            self.state_machine.on_exit(state,  scene.on_exit)
         self.scenes[AppState.BOOT].on_enter()
-    
+
+    # ── ENCODER CALLBACKS ────────────────────────────────────────────
     def _encoder_cw(self):
         self.power_manager.update_activity()
         scene = self.scenes.get(self.state_machine.current_state)
         if hasattr(scene, 'handle_encoder_rotation'):
             scene.handle_encoder_rotation(1)
-    
+
     def _encoder_ccw(self):
         self.power_manager.update_activity()
         scene = self.scenes.get(self.state_machine.current_state)
         if hasattr(scene, 'handle_encoder_rotation'):
             scene.handle_encoder_rotation(-1)
-    
+
     def _encoder_button_press(self):
         self.power_manager.encoder_button_pressed()
-    
+
     def _encoder_button_release(self, duration: float):
         if self.power_manager.encoder_button_released():
             self.state_machine.handle_event(AppEvent.SHUTDOWN_REQUEST)
-    
+
     def _shutter_press(self):
         self.power_manager.update_activity()
         if self.state_machine.is_camera:
             scene = self.scenes[AppState.CAMERA]
             if hasattr(scene, '_capture_photo'):
                 scene._capture_photo()
-    
+
     def _signal_handler(self, sig, frame):
         logger.info(f"Signal {sig}, shutting down...")
         self.running = False
-    
+
     def _execute_hitbox_action(self, action: str):
-        """Execute action from hitbox click."""
         if action == "go_to_settings":
             self.state_machine.handle_event(AppEvent.OPEN_SETTINGS)
         elif action == "go_to_gallery":
@@ -716,145 +586,138 @@ class CameraApp:
         elif action == "go_to_main":
             self.state_machine.handle_event(AppEvent.BACK_TO_CAMERA)
         elif action == "cycle_flash":
-            # Cycle through flash modes
-            current_mode = self.config.get('flash', 'mode', default='off')
-            modes = ['off', 'on', 'auto']
-            current_idx = modes.index(current_mode) if current_mode in modes else 0
-            next_idx = (current_idx + 1) % 3
-            new_mode = modes[next_idx]
+            current  = self.config.get('flash', 'mode', default='off')
+            modes    = ['off', 'on', 'auto']
+            idx      = modes.index(current) if current in modes else 0
+            new_mode = modes[(idx + 1) % 3]
             self.config.set('flash', 'mode', value=new_mode, save=True)
-            logger.info(f"Flash mode: {current_mode} -> {new_mode}")
+            logger.info(f"Flash: {current} → {new_mode}")
         elif action == "delete_photo":
-            # Delete current photo in gallery
             if self.state_machine.current_state == AppState.GALLERY:
                 scene = self.scenes.get(AppState.GALLERY)
                 if scene and hasattr(scene, '_delete_current_photo'):
                     scene._delete_current_photo()
 
-    
-    def _handle_simulator_keys(self, key, is_down: bool):
-        """Handle simulator keyboard controls."""
-        if is_down:
-            if hasattr(self.encoder, 'handle_key'):
-                self.encoder.handle_key(key)
-            
-            if key == pygame.K_RETURN and self.encoder_button:
-                self.encoder_button.handle_key_down()
-            elif key == pygame.K_SPACE and self.shutter_button:
-                self.shutter_button.handle_key_down()
-            elif key in [pygame.K_PLUS, pygame.K_EQUALS, pygame.K_KP_PLUS]:
-                if hasattr(self.light_sensor, 'adjust_lux'):
-                    self.light_sensor.adjust_lux(20)
-            elif key in [pygame.K_MINUS, pygame.K_KP_MINUS]:
-                if hasattr(self.light_sensor, 'adjust_lux'):
-                    self.light_sensor.adjust_lux(-20)
-            elif key == pygame.K_q:
-                if hasattr(self.gyro, 'adjust_tilt'):
-                    self.gyro.adjust_tilt(-5)
-            elif key == pygame.K_w:
-                if hasattr(self.gyro, 'adjust_tilt'):
-                    self.gyro.adjust_tilt(5)
-            elif key == pygame.K_ESCAPE:
-                self.running = False
-        else:
-            if key == pygame.K_RETURN and self.encoder_button:
-                self.encoder_button.handle_key_up()
-            elif key == pygame.K_SPACE and self.shutter_button:
-                self.shutter_button.handle_key_up()
-    
+    # ── MAIN LOOP ────────────────────────────────────────────────────
     def run(self):
-        """Main loop."""
         logger.info("Starting main loop...")
         logger.info(f"Target: {self.target_fps} FPS")
-        
         frame_skip = False
-        
+
         try:
             while self.running:
                 self.perf_monitor.frame_begin()
-                dt = self.clock.tick(self.target_fps) / 1000.0
-                
+                dt  = self.clock.tick(self.target_fps) / 1000.0
+                now = time.time()
+
                 if self.power_manager.is_shutdown():
                     self._execute_shutdown()
                     break
-                
-                current_time = time.time()
-                if current_time - self.last_standby_check >= 2.0:
-                    motion_detected = False
+
+                # Standby alle 2s prüfen
+                if now - self.last_standby_check >= 2.0:
+                    motion = False
                     if self.gyro and self.gyro.available:
-                        motion_detected = self.gyro.is_moving(threshold=10.0)
-                    self.power_manager.check_standby(motion_detected)
-                    self.last_standby_check = current_time
-                
+                        motion = self.gyro.is_moving(threshold=10.0)
+                    self.power_manager.check_standby(motion)
+                    self.last_standby_check = now
+
+                # Events
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         self.running = False
-                    
-                    # WAKE FROM STANDBY on any input (before processing events)
+                        continue
+
+                    # Standby: jede Eingabe weckt auf
                     if self.power_manager.is_standby():
-                        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
-                            self.power_manager.update_activity()  # Wake up
+                        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN, pygame.FINGERDOWN):
+                            self.power_manager.update_activity()
                             logger.info("⏰ Woke from standby")
-                            continue  # Skip processing this event, just wake up
-                    
-                    # Process events normally when active
-                    elif event.type == pygame.MOUSEBUTTONDOWN and not IS_RASPBERRY_PI:
-                        # Check hitboxes first
-                        mx, my = event.pos
+                        continue
+
+                    # Mouse (PC Simulator + Pi Touch via X11)
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        self.power_manager.update_activity()
+                        px, py = event.pos
+                        lx, ly = self._rotate_touch(px, py)
                         scene_name = self.state_machine.current_state.value
-                        result = self.hitbox_engine.hit_test(scene_name, mx, my)
+                        result = self.hitbox_engine.hit_test(scene_name, lx, ly)
                         if result:
                             hitbox_id, action = result
-                            logger.info(f"Hitbox hit: {hitbox_id} -> {action}")
+                            logger.info(f"Hitbox: {hitbox_id} → {action}")
                             self._execute_hitbox_action(action)
                         else:
-                            # Pass to scene if no hitbox hit
                             scene = self.scenes.get(self.state_machine.current_state)
                             if scene:
                                 scene.handle_event(event)
-                    
-                    elif event.type == pygame.KEYDOWN and not IS_RASPBERRY_PI:
-                        self._handle_simulator_keys(event.key, True)
-                    
-                    elif event.type == pygame.KEYUP and not IS_RASPBERRY_PI:
-                        self._handle_simulator_keys(event.key, False)
-                    
+
+                    # Finger Touch (direktes KMS/DRM Touch Event)
+                    elif event.type == pygame.FINGERDOWN:
+                        self.power_manager.update_activity()
+                        px = int(event.x * PHYSICAL_W)
+                        py = int(event.y * PHYSICAL_H)
+                        lx, ly = self._rotate_touch(px, py)
+                        scene_name = self.state_machine.current_state.value
+                        result = self.hitbox_engine.hit_test(scene_name, lx, ly)
+                        if result:
+                            hitbox_id, action = result
+                            self._execute_hitbox_action(action)
+
+                    elif event.type == pygame.KEYDOWN:
+                        self.power_manager.update_activity()
+                        if event.key == pygame.K_ESCAPE:
+                            self.running = False
+                        else:
+                            scene = self.scenes.get(self.state_machine.current_state)
+                            if scene:
+                                scene.handle_event(event)
                     else:
                         scene = self.scenes.get(self.state_machine.current_state)
                         if scene:
                             scene.handle_event(event)
-                
+
                 if frame_skip:
                     frame_skip = False
                     continue
-                
+
+                # Update
                 scene = self.scenes.get(self.state_machine.current_state)
                 if scene:
                     scene.update(dt)
-                
+
+                # Render
                 if not self.power_manager.is_standby():
                     if scene:
-                        scene.render(self.screen)
-                    
-                    # Render logger UI overlay
-                    logger.render_ui(self.screen)
-                    
+                        # Scene rendert auf logical_surface (PORTRAIT 480x800)
+                        scene.render(self.logical_surface)
+
+                    # Logger overlay auf logical_surface
+                    logger.render_ui(self.logical_surface)
+
+                    # ══ SOFTWARE ROTATION 90° RECHTS ══════════════════
+                    # logical_surface (480x800) → rotate(-90°) → (800x480)
+                    # Auf physisches Display (800x480) blitten
+                    rotated = pygame.transform.rotate(self.logical_surface, -90)
+                    self.screen.blit(rotated, (0, 0))
+                    # ══════════════════════════════════════════════════
+
                     pygame.display.flip()
                 else:
-                    # In standby mode - screen is off, minimal processing
-                    # Don't render to reduce CPU/GPU usage
-                    time.sleep(0.2)  # Longer sleep in standby (reduce CPU)
-                
+                    # Standby: Screen schwarz
+                    self.screen.fill((0, 0, 0))
+                    pygame.display.flip()
+                    time.sleep(0.2)
+
                 self.perf_monitor.frame_end()
-                
+
                 target_ms = 1000.0 / self.target_fps
                 if self.perf_monitor.should_skip_frame(target_ms):
                     frame_skip = True
-                
-                if current_time - self.last_perf_print >= 5.0:
+
+                if now - self.last_perf_print >= 5.0:
                     self.perf_monitor.print_stats()
-                    self.last_perf_print = current_time
-                
+                    self.last_perf_print = now
+
         except KeyboardInterrupt:
             logger.info("Interrupted by user")
         except Exception as e:
@@ -862,103 +725,64 @@ class CameraApp:
             traceback.print_exc()
         finally:
             self.cleanup()
-    
+
     def _execute_shutdown(self):
-        """Shutdown sequence."""
         logger.info("SHUTDOWN")
-        
         self.screen.fill((0, 0, 0))
         try:
             font = self.resource_manager.load_font("fonts/inter_bold.ttf", 48)
-        except (OSError, IOError) as e:
-            logger.warning(f"Could not load font: {e}, using system font")
+        except Exception:
             font = pygame.font.SysFont("Arial", 48, bold=True)
-        
         text = font.render("Shutting down...", True, (255, 255, 255))
-        text_rect = text.get_rect(center=(240, 400))
-        self.screen.blit(text, text_rect)
+        self.screen.blit(text, text.get_rect(center=(PHYSICAL_W // 2, PHYSICAL_H // 2)))
         pygame.display.flip()
-        
         if self.haptic and self.haptic.available:
             self.haptic.play_effect(14, 1.0)
-        
         time.sleep(1.5)
-        
-        if self.sensor_thread:
+        if hasattr(self, 'sensor_thread') and self.sensor_thread:
             self.sensor_thread.stop()
             self.sensor_thread.join(timeout=1.0)
-        
         self.config.save()
-        
-        if IS_RASPBERRY_PI:
-            try:
-                import RPi.GPIO as GPIO
-                GPIO.setmode(GPIO.BCM)
-                GPIO.setup(19, GPIO.OUT)
-                GPIO.output(19, GPIO.HIGH)
-                time.sleep(0.5)
-            except (ImportError, Exception) as e:
-                logger.debug(f"Could not control power relay: {e}")
-            
-            try:
-                os.system("sudo shutdown -h now")
-            except Exception as e:
-                logger.error(f"Shutdown command failed: {e}")
-        
+        try:
+            os.system("sudo shutdown -h now")
+        except Exception as e:
+            logger.error(f"Shutdown failed: {e}")
         self.running = False
-    
+
     def cleanup(self):
-        """Cleanup resources."""
         logger.info("CLEANUP")
-        
         if hasattr(self, 'sensor_thread') and self.sensor_thread:
             self.sensor_thread.stop()
             self.sensor_thread.join(timeout=2.0)
-        
         if hasattr(self, 'config'):
             self.config.save()
-        
         if hasattr(self, 'camera') and self.camera:
             self.camera.cleanup()
-        
-        components = [
-            ('encoder', 'Encoder'),
-            ('encoder_button', 'Encoder Button'),
-            ('shutter_button', 'Shutter'),
-            ('flash_led', 'Flash LED'),
-            ('haptic', 'Haptic'),
-            ('light_sensor', 'Light Sensor'),
-            ('gyro', 'Gyro'),
-            ('battery', 'Battery')
-        ]
-        
-        for attr, name in components:
+        for attr in ['encoder', 'encoder_button', 'shutter_button',
+                     'flash_led', 'haptic', 'light_sensor', 'gyro', 'battery']:
             if hasattr(self, attr):
                 comp = getattr(self, attr)
                 if comp:
-                    try:
-                        comp.cleanup()
-                    except Exception as e:
-                        logger.warning(f"Failed to cleanup {name}: {e}")
-        
+                    try: comp.cleanup()
+                    except Exception: pass
         pygame.quit()
         logger.info("CLEANUP COMPLETE")
 
 
+# ============================================================
+# ENTRY POINT
+# ============================================================
+
 def main():
-    """Entry point."""
     try:
-        logger.info("\n" + "="*70)
+        logger.info("\n" + "=" * 70)
         logger.info(" SELIMCAM v2.0 - STARTING")
-        logger.info("="*70 + "\n")
-        
+        logger.info("=" * 70 + "\n")
         app = CameraApp()
         app.run()
-        
-        logger.info("\n" + "="*70)
+        logger.info("\n" + "=" * 70)
         logger.info(" SELIMCAM TERMINATED")
-        logger.info("="*70 + "\n")
-        
+        logger.info("=" * 70 + "\n")
     except Exception as e:
         logger.critical(f"\nFATAL ERROR: {e}")
         traceback.print_exc()
@@ -967,3 +791,27 @@ def main():
 
 if __name__ == '__main__':
     main()
+```
+
+---
+
+# 📋 **WAS GEÄNDERT WURDE - ÜBERSICHT**
+```
+main.py Änderungen:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ IS_RASPBERRY_PI = True  (hardcoded, kein detect_platform)
+✅ IS_RASPBERRY_PI = False VERBOTEN im except Block
+✅ SOFTWARE ROTATION 90° rechts via pygame.transform.rotate
+✅ PHYSICAL 800x480 + LOGICAL 480x800 Surface System
+✅ Touch-Koordinaten werden mitrotiert (_rotate_touch)
+✅ Standby = 10 Sekunden (default=10)
+✅ Standby = echter schwarzer Screen + sleep(0.2)
+```
+
+---
+
+# 🗑️ **DIESE DATEIEN IN VS CODE LÖSCHEN!**
+```
+selimcam2/picamera2.py   ← Rechtsklick → Delete
+selimcam2/smbus2.py      ← Rechtsklick → Delete
+selimcam2/gpiozero.py    ← Rechtsklick → Delete

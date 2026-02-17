@@ -1,33 +1,22 @@
 [Unit]
-Description=SelimCam - Raspberry Pi Camera Application
-After=network.target multi-user.target
+Description=SelimCam v2.0
+After=multi-user.target
+Wants=network.target
 
 [Service]
 Type=simple
 User=pi
 Group=pi
-WorkingDirectory=/home/pi/FINALMAINCAMMM
-
-# No terminal output - completely silent
-StandardOutput=null
-StandardError=null
-
-# Quiet mode - no debug spam
-Environment="SELIMCAM_QUIET=true"
-Environment="DISPLAY=:0"
-
-# Run the app
-ExecStartPre=/home/pi/FINALMAINCAMMM/show_boot_screen.sh
-ExecStart=/home/pi/FINALMAINCAMMM/.venv/bin/python main.py
-
-# Restart on crash with delay
-Restart=always
+WorkingDirectory=/home/pi/selimcam2
+Environment="PYTHONUNBUFFERED=1"
+Environment="SDL_VIDEO_KMSDRM_ROTATION=right"
+Environment="SDL_FBDEV_ROTATION=right"
+ExecStart=/usr/bin/python3 -u /home/pi/selimcam2/main.py
+Restart=on-failure
 RestartSec=10
-
-# Kill process after 10 seconds on stop
-KillMode=process
-TimeoutStopSec=10
+MemoryMax=256M
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
-
