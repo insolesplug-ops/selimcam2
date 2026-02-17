@@ -160,7 +160,8 @@ class ConfigManager:
                 "capture_width": 2592,
                 "capture_height": 1944,
                 "capture_quality": 92,
-                "rotation_test": 2
+                "rotation_test": 1,
+                "use_kms_rotation": True
             },
             "display": {
                 "width": 480,

@@ -10,8 +10,8 @@ Group=pi
 WorkingDirectory=/home/pi/selimcam2
 Environment="PYTHONUNBUFFERED=1"
 Environment="SDL_VIDEODRIVER=kmsdrm"
-Environment="SDL_VIDEO_KMSDRM_ROTATION=1"
-Environment="SDL_FBDEV_ROTATION=1"
+Environment="SDL_VIDEO_KMSDRM_ROTATION=90"
+Environment="SDL_FBDEV_ROTATION=90"
 ExecStart=/bin/bash /home/pi/selimcam2/start_camera.sh
 Restart=always
 RestartSec=5
