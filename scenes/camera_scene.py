@@ -91,7 +91,7 @@ class CameraScene:
         
         self.app.power_manager.update_activity()
         
-        elif event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == pygame.MOUSEBUTTONDOWN:
             mx, my = event.pos
             
             # Check hitboxes
