@@ -372,51 +372,50 @@ class CameraScene:
         return frame[y1:y2, x1:x2]
     
     def _frame_to_surface(self, frame: np.ndarray) -> Optional[pygame.Surface]:
-        """Convert numpy frame to pygame surface.
-        
-        WARNING: KMS rotation happens at display level AFTER rendering.
-        Frame rotation in app + KMS rotation = DOUBLE ROTATION!
-        
-        Test modes via config "camera.rotation_test":
-        - 0: Frame rotation ENABLED (90° CW) + KMS rotation "1" = 180° total
-        - 1: Frame rotation DISABLED (no rotation) + KMS rotation "1" = correct!?
-        - 2: Frame rotation 90° CCW + KMS rotation "1"
+        """Convert numpy frame to pygame surface with stable rotation + cover scaling.
+
+        rotation_test values:
+        - 0: 90° CW (default for portrait preview)
+        - 1: no rotation
+        - 2: 90° CCW
+        - 3: 180°
         """
         try:
             screen_w, screen_h = self.app.logical_surface.get_size()
-            
-            rotation_mode = self.app.config.get('camera', 'rotation_test', default=1)
+
+            rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
             logger.debug(f"[FRAME] Input: {frame.shape} | Rotation mode: {rotation_mode}")
-            
+
+            base = pygame.surfarray.make_surface(np.swapaxes(frame, 0, 1))
+
             if rotation_mode == 0:
-                # 90° CW rotation
-                rotated = np.rot90(frame, k=-1)
-                logger.debug(f"[FRAME] Mode 0: 90° CW → {rotated.shape}")
+                oriented = pygame.transform.rotate(base, -90)
+                logger.debug(f"[FRAME] Mode 0: 90° CW → {oriented.get_size()}")
             elif rotation_mode == 1:
-                # NO rotation - let KMS handle it
-                rotated = frame
-                logger.debug(f"[FRAME] Mode 1: No rotation (KMS only) → {rotated.shape}")
+                oriented = base
+                logger.debug(f"[FRAME] Mode 1: no rotation → {oriented.get_size()}")
             elif rotation_mode == 2:
-                # 90° CCW rotation
-                rotated = np.rot90(frame, k=1)
-                logger.debug(f"[FRAME] Mode 2: 90° CCW → {rotated.shape}")
+                oriented = pygame.transform.rotate(base, 90)
+                logger.debug(f"[FRAME] Mode 2: 90° CCW → {oriented.get_size()}")
             else:
-                # 180° rotation
-                rotated = np.rot90(frame, k=2)
-                logger.debug(f"[FRAME] Mode 3: 180° → {rotated.shape}")
-            
-            # Convert to pygame surface
-            swapped = np.swapaxes(rotated, 0, 1)
-            surf = pygame.surfarray.make_surface(swapped)
-            logger.debug(f"[FRAME] pygame surface: {surf.get_size()}")
-            
-            # Scale to display dimensions
-            if surf.get_size() != (screen_w, screen_h):
-                logger.debug(f"[FRAME] Scaling {surf.get_size()} → {(screen_w, screen_h)}")
-                surf = pygame.transform.scale(surf, (screen_w, screen_h))
-            
-            logger.debug(f"[FRAME] ✓ Final: {surf.get_size()}")
-            return surf
+                oriented = pygame.transform.rotate(base, 180)
+                logger.debug(f"[FRAME] Mode 3: 180° → {oriented.get_size()}")
+
+            # Aspect-preserving cover scale (no stretching)
+            src_w, src_h = oriented.get_size()
+            scale = max(screen_w / src_w, screen_h / src_h)
+            scaled_w = max(1, int(round(src_w * scale)))
+            scaled_h = max(1, int(round(src_h * scale)))
+            scaled = pygame.transform.smoothscale(oriented, (scaled_w, scaled_h))
+
+            # Center crop to final portrait canvas
+            x = max(0, (scaled_w - screen_w) // 2)
+            y = max(0, (scaled_h - screen_h) // 2)
+            final = pygame.Surface((screen_w, screen_h))
+            final.blit(scaled, (-x, -y))
+
+            logger.debug(f"[FRAME] Cover scale {src_w}x{src_h} -> {scaled_w}x{scaled_h}, crop ({x},{y}) -> {screen_w}x{screen_h}")
+            return final
         except Exception as e:
             logger.error(f"[FRAME] ✗ Conversion failed: {e}", exc_info=True)
             return None
