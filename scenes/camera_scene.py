@@ -369,12 +369,21 @@ class CameraScene:
         return frame[y1:y2, x1:x2]
     
     def _frame_to_surface(self, frame: np.ndarray) -> Optional[pygame.Surface]:
-        """Convert numpy frame to pygame surface."""
+        """Convert numpy frame to pygame surface with 90° CW rotation for portrait mode."""
         try:
             screen_w, screen_h = self.app.logical_surface.get_size()
             
-            surf = pygame.surfarray.make_surface(np.swapaxes(frame, 0, 1))
-            surf = pygame.transform.scale(surf, (screen_w, screen_h))
+            # Rotate frame 90° clockwise: landscape (480, 640) -> portrait (640, 480)
+            # np.rot90(k=-1) rotates 90° CW
+            rotated = np.rot90(frame, k=-1)
+            logger.debug(f"[Frame] Original: {frame.shape} → Rotated: {rotated.shape}")
+            
+            # Convert to pygame surface
+            surf = pygame.surfarray.make_surface(np.swapaxes(rotated, 0, 1))
+            
+            # Scale to display dimensions (480x800 portrait)
+            if surf.get_size() != (screen_w, screen_h):
+                surf = pygame.transform.scale(surf, (screen_w, screen_h))
             
             return surf
         except Exception as e:
