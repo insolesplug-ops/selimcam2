@@ -160,8 +160,8 @@ class ConfigManager:
                 "capture_width": 2592,
                 "capture_height": 1944,
                 "capture_quality": 92,
-                "rotation_test": 1,
-                "use_kms_rotation": True
+                "rotation_test": 0,
+                "use_kms_rotation": False
             },
             "display": {
                 "width": 480,
@@ -186,7 +186,11 @@ class ConfigManager:
                 "info_display": "minimal",
                 "freeze_duration_ms": 700,
                 "flash_overlay_enabled": False,
-                "debug_frame_logs": False
+                "debug_frame_logs": False,
+                "touch_debug_overlay": True
+            },
+            "touch": {
+                "swap_axes": True
             },
             "zoom": {
                 "current": 1.0,

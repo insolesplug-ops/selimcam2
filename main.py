@@ -387,9 +387,11 @@ class CameraApp:
         # Logische Surface PORTRAIT (so wie App denkt)
         # Alle Scenes rendern NUR auf diese Surface!
         self.logical_surface = pygame.Surface((LOGICAL_W, LOGICAL_H))
+        self.last_touch_point = None
+        self.last_touch_ts = 0.0
 
         pygame.display.set_caption("SelimCam v2.0")
-        logger.info(f"Display mode: {LOGICAL_W}x{LOGICAL_H} portrait (native via KMS 90° rotation)")
+        logger.info(f"Display mode: {LOGICAL_W}x{LOGICAL_H} portrait (cmdline rotation, SDL rotation disabled)")
 
         self.clock = pygame.time.Clock()
         self.target_fps = self.config.get('camera', 'preview_fps', default=24)
@@ -457,9 +459,22 @@ class CameraApp:
             pass
 
     def _rotate_touch(self, px: int, py: int) -> tuple:
-        """90 degree CW rotation: x_mapped = y_raw, y_mapped = 800 - x_raw"""
-        lx = max(0, min(479, int(py)))
-        ly = max(0, min(799, int(800 - px)))
+        """Map raw touch to logical portrait coordinates.
+
+        Default mapping (swap axes) for drivers reporting landscape coordinates:
+        x_final = y_raw
+        y_final = LOGICAL_H - x_raw
+        """
+        swap_axes = self.config.get('touch', 'swap_axes', default=True)
+        if swap_axes:
+            lx = int(py)
+            ly = int(LOGICAL_H - px)
+        else:
+            lx = int(px)
+            ly = int(py)
+
+        lx = max(0, min(LOGICAL_W - 1, lx))
+        ly = max(0, min(LOGICAL_H - 1, ly))
         return (lx, ly)
 
     def _init_hardware_safe(self) -> dict:
@@ -717,6 +732,8 @@ class CameraApp:
                         self.power_manager.update_activity()
                         px, py = event.pos
                         lx, ly = self._rotate_touch(px, py)
+                        self.last_touch_point = (lx, ly)
+                        self.last_touch_ts = time.time()
                         logger.debug(f"[TOUCH] Raw: ({px}, {py}) → Mapped: ({lx}, {ly})")
                         rotated_event = pygame.event.Event(
                             pygame.MOUSEBUTTONDOWN,
@@ -744,6 +761,8 @@ class CameraApp:
                         px = int(event.x * PHYSICAL_W)
                         py = int(event.y * PHYSICAL_H)
                         lx, ly = self._rotate_touch(px, py)
+                        self.last_touch_point = (lx, ly)
+                        self.last_touch_ts = time.time()
                         logger.debug(f"[TOUCH] Raw: ({px}, {py}) → Mapped: ({lx}, {ly})")
                         rotated_event = pygame.event.Event(
                             pygame.MOUSEBUTTONDOWN,
@@ -794,6 +813,12 @@ class CameraApp:
 
                     # Logger overlay auf logical_surface
                     logger.render_ui(self.logical_surface)
+
+                    # Touch debug overlay: red point where mapped touch is processed
+                    if self.config.get('ui', 'touch_debug_overlay', default=True):
+                        if self.last_touch_point and (time.time() - self.last_touch_ts) < 1.2:
+                            pygame.draw.circle(self.logical_surface, (255, 0, 0), self.last_touch_point, 10)
+                            pygame.draw.circle(self.logical_surface, (255, 255, 255), self.last_touch_point, 12, 2)
 
                     # Direct blit: logical 480x800 renders natively to physical 480x800 (KMS 90° rotation)
                     self.screen.blit(self.logical_surface, (0, 0))

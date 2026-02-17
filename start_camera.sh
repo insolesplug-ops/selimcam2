@@ -8,11 +8,12 @@ cd "$SCRIPT_DIR" || exit 1
 export PYTHONUNBUFFERED=1
 export SELIMCAM_QUIET=true
 export SDL_VIDEODRIVER="kmsdrm"
+export SDL_TOUCH_MOUSE_EVENTS="1"
 
-# KMS rotation in DEGREES (SDL expects degrees, not 0/1/2/3 enums)
-# 0 / 90 / 180 / 270
-export SDL_VIDEO_KMSDRM_ROTATION="90"
-export SDL_FBDEV_ROTATION="90"
+# Display rotation is handled via cmdline.txt (display_lcd_rotate=270)
+# Keep SDL rotation disabled to avoid double-rotation.
+export SDL_VIDEO_KMSDRM_ROTATION="0"
+export SDL_FBDEV_ROTATION="0"
 
 if [[ -f ".venv/bin/activate" ]]; then
 	# shellcheck disable=SC1091

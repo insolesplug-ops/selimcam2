@@ -391,20 +391,10 @@ class CameraScene:
         try:
             screen_w, screen_h = self.app.logical_surface.get_size()
 
-            rotation_mode_cfg = self.app.config.get('camera', 'rotation_test', default=1)
-            use_kms_rotation = self.app.config.get('camera', 'use_kms_rotation', default=True)
-            kms_rotation = str(os.getenv("SDL_VIDEO_KMSDRM_ROTATION", "")).strip()
-
-            if use_kms_rotation and kms_rotation in ("90", "270"):
-                rotation_mode = 1
-            else:
-                rotation_mode = rotation_mode_cfg
+            rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
 
             if self._debug_frame_logs:
-                logger.debug(
-                    f"[FRAME] Input: {frame.shape} | Rotation mode: {rotation_mode} "
-                    f"(cfg={rotation_mode_cfg}, kms={kms_rotation}, use_kms={use_kms_rotation})"
-                )
+                logger.debug(f"[FRAME] Input: {frame.shape} | Rotation mode: {rotation_mode}")
 
             base = pygame.surfarray.make_surface(np.swapaxes(frame, 0, 1))
 
