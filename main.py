@@ -471,10 +471,10 @@ class CameraApp:
         We rotate logical +90° CCW to get physical display.
         Inverse transform: physical (px, py) → logical (lx, ly)
         
-        For +90° CCW rotation: (x, y) → (height - y, x)
+        For +90° rotation: (px, py) → (py, 800-px)
         """
-        lx = int(800 - py)
-        ly = int(px)
+        lx = int(py)
+        ly = int(800 - px)
 
         lx = max(0, min(LOGICAL_W - 1, lx))
         ly = max(0, min(LOGICAL_H - 1, ly))

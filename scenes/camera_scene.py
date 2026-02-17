@@ -434,21 +434,18 @@ class CameraScene:
 
             # NO ADDITIONAL 180° FLIP - each mode is self-contained
 
-            # Aspect-preserving scale into preview area 480x800 WITHOUT CROPPING (contain mode)
+            # Cover-scale: fill entire 480x800 without black bars (may crop edges)
             src_w, src_h = oriented.get_size()
-            scale = min(preview_w / src_w, preview_h / src_h)  # CONTAIN (not COVER)
+            scale = max(preview_w / src_w, preview_h / src_h)  # COVER mode
             scaled_w = max(1, int(round(src_w * scale)))
             scaled_h = max(1, int(round(src_h * scale)))
             scaled = pygame.transform.scale(oriented, (scaled_w, scaled_h))
 
-            # Center on final preview surface (480x800) with black bars if needed
+            # Center crop to final preview surface (480x800)
+            x = max(0, (scaled_w - preview_w) // 2)
+            y = max(0, (scaled_h - preview_h) // 2)
             final = pygame.Surface((preview_w, preview_h))
-            final.fill((0, 0, 0))  # Black background for pillarbox/letterbox
-            
-            # Center the scaled image
-            x = (preview_w - scaled_w) // 2
-            y = (preview_h - scaled_h) // 2
-            final.blit(scaled, (x, y))
+            final.blit(scaled, (-x, -y))
 
             if self._debug_frame_logs:
                 logger.debug(f"[FRAME] Cover scale {src_w}x{src_h} -> {scaled_w}x{scaled_h}, crop ({x},{y}) -> {preview_w}x{preview_h}")
@@ -487,29 +484,32 @@ class CameraScene:
             )
     
     def _render_ui_buttons(self, screen: pygame.Surface):
-        """Render UI buttons using actual PNG coordinates from hitboxes."""
-        # SETTINGS - (248, 735) 73x48
-        if self.settings_icon:
-            try:
-                scaled_settings = pygame.transform.scale(self.settings_icon, (73, 48))
-                screen.blit(scaled_settings, (248, 735))
-            except Exception as e:
-                logger.debug(f"[UI] Settings icon error: {e}")
-        
-        # FLASH - (321, 735) 73x48
-        flash_mode = self.app.config.get('flash', 'mode', default='off')
-        flash_overlay = self.flash_overlays.get(flash_mode)
-        if flash_overlay:
-            try:
-                scaled_flash = pygame.transform.scale(flash_overlay, (73, 48))
-                screen.blit(scaled_flash, (321, 735))
-            except Exception as e:
-                logger.debug(f"[UI] Flash overlay error: {e}")
-        
-        # GALLERY - (387, 735) 73x48
-        if self.gallery_icon:
-            try:
-                scaled_gallery = pygame.transform.scale(self.gallery_icon, (73, 48))
-                screen.blit(scaled_gallery, (387, 735))
-            except Exception as e:
-                logger.debug(f"[UI] Gallery icon error: {e}")
+        """Render UI button overlays from assets at exact hitbox coordinates."""
+        try:
+            # SETTINGS - (248, 735) 73x48
+            settings_overlay = self.app.resource_manager.get_image("ui/settings.png")
+            if settings_overlay:
+                settings_scaled = pygame.transform.scale(settings_overlay, (73, 48))
+                screen.blit(settings_scaled, (248, 735))
+            
+            # FLASH - (321, 735) 73x48
+            flash_mode = self.app.config.get('flash', 'mode', default='off')
+            if flash_mode == 'on':
+                flash_overlay = self.app.resource_manager.get_image("ui/flash on.png")
+            elif flash_mode == 'auto':
+                flash_overlay = self.app.resource_manager.get_image("ui/flash automatically.png")
+            else:  # 'off'
+                flash_overlay = self.app.resource_manager.get_image("ui/flash off.png")
+            
+            if flash_overlay:
+                flash_scaled = pygame.transform.scale(flash_overlay, (73, 48))
+                screen.blit(flash_scaled, (321, 735))
+            
+            # GALLERY - (387, 735) 73x48
+            gallery_overlay = self.app.resource_manager.get_image("ui/gallery.png")
+            if gallery_overlay:
+                gallery_scaled = pygame.transform.scale(gallery_overlay, (73, 48))
+                screen.blit(gallery_scaled, (387, 735))
+                
+        except Exception as e:
+            logger.debug(f"[UI] Button overlay error: {e}")
