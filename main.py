@@ -797,7 +797,6 @@ class CameraApp:
 
                     # Direct blit: logical 480x800 renders natively to physical 480x800 (KMS 90° rotation)
                     self.screen.blit(self.logical_surface, (0, 0))
-                    logger.debug(f"[RENDER] Display updated (480x800, native portrait mode)")
 
                     pygame.display.update([pygame.Rect(0, 0, PHYSICAL_W, PHYSICAL_H)])
                 else:

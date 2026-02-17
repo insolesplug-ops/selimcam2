@@ -54,6 +54,8 @@ class CameraScene:
         self.frame_count = 0
         self.fps = 0
         self.last_fps_time = time.time()
+        self._debug_frame_logs = bool(app.config.get('ui', 'debug_frame_logs', default=False))
+        self._last_no_frame_log = 0.0
         
         # Fonts with fallback
         try:
@@ -254,19 +256,22 @@ class CameraScene:
             if hasattr(self.app.camera, "get_preview_surface"):
                 preview_surface = self.app.camera.get_preview_surface()
             frame = self.app.camera.get_preview_frame()
-            logger.debug(f"[RENDER] Camera preview: surface={preview_surface is not None}, frame={frame is not None}")
+            if self._debug_frame_logs:
+                logger.debug(f"[RENDER] Camera preview: surface={preview_surface is not None}, frame={frame is not None}")
         else:
             logger.error("[RENDER] ✗ Camera not initialized!")
 
         if preview_surface is not None:
-            logger.debug(f"[RENDER] Using preview_surface: {preview_surface.get_size()}")
+            if self._debug_frame_logs:
+                logger.debug(f"[RENDER] Using preview_surface: {preview_surface.get_size()}")
             screen_w = self.app.config.get('display', 'width', default=480)
             screen_h = self.app.config.get('display', 'height', default=800)
             if preview_surface.get_size() != (screen_w, screen_h):
                 preview_surface = pygame.transform.scale(preview_surface, (screen_w, screen_h))
             screen.blit(preview_surface, (0, 0))
         elif frame is not None:
-            logger.debug(f"[RENDER] Converting numpy frame: {frame.shape}")
+            if self._debug_frame_logs:
+                logger.debug(f"[RENDER] Converting numpy frame: {frame.shape}")
             filter_type_str = self.app.config.get('filter', 'active', default='none')
             filter_type = FilterType(filter_type_str)
             iso_value = self.app.config.get('filter', 'iso_fake', default=400)
@@ -276,14 +281,16 @@ class CameraScene:
             surf = self._frame_to_surface(zoomed_frame)
 
             if surf:
-                logger.debug(f"[RENDER] ✓ Blitting {surf.get_size()} to screen")
                 screen.blit(surf, (0, 0))
             else:
                 logger.error("[RENDER] ✗ Frame conversion failed!")
                 screen.fill((255, 0, 0))
                 self._render_error(screen, "Frame→Surface error")
         else:
-            logger.error("[RENDER] ✗ NO CAMERA FRAMES!")
+            now = time.time()
+            if now - self._last_no_frame_log >= 1.0:
+                logger.error("[RENDER] ✗ NO CAMERA FRAMES!")
+                self._last_no_frame_log = now
             screen.fill((255, 100, 100))
             try:
                 text_surf = self.font_bold.render("CAMERA ERROR", True, (255, 255, 255))
@@ -383,30 +390,35 @@ class CameraScene:
         try:
             screen_w, screen_h = self.app.logical_surface.get_size()
 
-            rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
-            logger.debug(f"[FRAME] Input: {frame.shape} | Rotation mode: {rotation_mode}")
+            rotation_mode = self.app.config.get('camera', 'rotation_test', default=2)
+            if self._debug_frame_logs:
+                logger.debug(f"[FRAME] Input: {frame.shape} | Rotation mode: {rotation_mode}")
 
             base = pygame.surfarray.make_surface(np.swapaxes(frame, 0, 1))
 
             if rotation_mode == 0:
                 oriented = pygame.transform.rotate(base, -90)
-                logger.debug(f"[FRAME] Mode 0: 90° CW → {oriented.get_size()}")
+                if self._debug_frame_logs:
+                    logger.debug(f"[FRAME] Mode 0: 90° CW → {oriented.get_size()}")
             elif rotation_mode == 1:
                 oriented = base
-                logger.debug(f"[FRAME] Mode 1: no rotation → {oriented.get_size()}")
+                if self._debug_frame_logs:
+                    logger.debug(f"[FRAME] Mode 1: no rotation → {oriented.get_size()}")
             elif rotation_mode == 2:
                 oriented = pygame.transform.rotate(base, 90)
-                logger.debug(f"[FRAME] Mode 2: 90° CCW → {oriented.get_size()}")
+                if self._debug_frame_logs:
+                    logger.debug(f"[FRAME] Mode 2: 90° CCW → {oriented.get_size()}")
             else:
                 oriented = pygame.transform.rotate(base, 180)
-                logger.debug(f"[FRAME] Mode 3: 180° → {oriented.get_size()}")
+                if self._debug_frame_logs:
+                    logger.debug(f"[FRAME] Mode 3: 180° → {oriented.get_size()}")
 
             # Aspect-preserving cover scale (no stretching)
             src_w, src_h = oriented.get_size()
             scale = max(screen_w / src_w, screen_h / src_h)
             scaled_w = max(1, int(round(src_w * scale)))
             scaled_h = max(1, int(round(src_h * scale)))
-            scaled = pygame.transform.smoothscale(oriented, (scaled_w, scaled_h))
+            scaled = pygame.transform.scale(oriented, (scaled_w, scaled_h))
 
             # Center crop to final portrait canvas
             x = max(0, (scaled_w - screen_w) // 2)
@@ -414,7 +426,8 @@ class CameraScene:
             final = pygame.Surface((screen_w, screen_h))
             final.blit(scaled, (-x, -y))
 
-            logger.debug(f"[FRAME] Cover scale {src_w}x{src_h} -> {scaled_w}x{scaled_h}, crop ({x},{y}) -> {screen_w}x{screen_h}")
+            if self._debug_frame_logs:
+                logger.debug(f"[FRAME] Cover scale {src_w}x{src_h} -> {scaled_w}x{scaled_h}, crop ({x},{y}) -> {screen_w}x{screen_h}")
             return final
         except Exception as e:
             logger.error(f"[FRAME] ✗ Conversion failed: {e}", exc_info=True)
