@@ -266,7 +266,7 @@ class CameraScene:
                 preview_surface = pygame.transform.scale(preview_surface, (screen_w, screen_h))
             screen.blit(preview_surface, (0, 0))
         elif frame is not None:
-            logger.debug(f"[RENDER] Converting numpy frame to surface")
+            logger.debug(f"[RENDER] Converting numpy frame: {frame.shape}")
             filter_type_str = self.app.config.get('filter', 'active', default='none')
             filter_type = FilterType(filter_type_str)
             iso_value = self.app.config.get('filter', 'iso_fake', default=400)
@@ -276,17 +276,20 @@ class CameraScene:
             surf = self._frame_to_surface(zoomed_frame)
 
             if surf:
-                logger.debug(f"[RENDER] ✓ Blitting frame surface {surf.get_size()} to screen")
+                logger.debug(f"[RENDER] ✓ Blitting {surf.get_size()} to screen")
                 screen.blit(surf, (0, 0))
             else:
-                logger.error("[RENDER] ✗ _frame_to_surface() returned None!")
-                screen.fill((20, 20, 20))
-                self._render_error(screen, "Frame conversion failed")
+                logger.error("[RENDER] ✗ Frame conversion failed!")
+                screen.fill((255, 0, 0))
+                self._render_error(screen, "Frame→Surface error")
         else:
-            # No frame - show placeholder
-            logger.debug("[RENDER] ⚠ No camera frames available - showing blank")
-            screen.fill((30, 30, 30))
-            self._render_placeholder(screen)
+            logger.error("[RENDER] ✗ NO CAMERA FRAMES!")
+            screen.fill((255, 100, 100))
+            try:
+                text_surf = self.font_bold.render("CAMERA ERROR", True, (255, 255, 255))
+                screen.blit(text_surf, (100, 350))
+            except:
+                pass
         
         # Grid overlay
         if self.app.config.get('ui', 'grid_enabled', default=False):
@@ -370,56 +373,50 @@ class CameraScene:
         return frame[y1:y2, x1:x2]
     
     def _frame_to_surface(self, frame: np.ndarray) -> Optional[pygame.Surface]:
-        """Convert numpy frame to pygame surface with rotation for portrait mode.
+        """Convert numpy frame to pygame surface.
         
-        Frame pipeline:
-        1. Camera outputs (480, 640, 3) - landscape from IMX219 sensor
-        2. Need to rotate to match portrait display
-        3. Scale to display dimensions (480, 800)
+        WARNING: KMS rotation happens at display level AFTER rendering.
+        Frame rotation in app + KMS rotation = DOUBLE ROTATION!
         
-        Test rotation values (set in config.json):
-        "camera": {"rotation_test": 0}  # 0:-1 (90°CW), 1: 1 (90°CCW), 2: 2 (180°), 3: none
+        Test modes via config "camera.rotation_test":
+        - 0: Frame rotation ENABLED (90° CW) + KMS rotation "1" = 180° total
+        - 1: Frame rotation DISABLED (no rotation) + KMS rotation "1" = correct!?
+        - 2: Frame rotation 90° CCW + KMS rotation "1"
         """
         try:
             screen_w, screen_h = self.app.logical_surface.get_size()
-            logger.debug(f"[FRAME_PIPELINE] Input: shape={frame.shape}, dtype={frame.dtype}")
-            logger.debug(f"[FRAME_PIPELINE] Target display: {screen_w}x{screen_h}")
             
-            # Get rotation test mode from config
             rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
+            logger.debug(f"[FRAME] Input: {frame.shape} | Rotation mode: {rotation_mode}")
             
-            # Apply rotation based on test mode
             if rotation_mode == 0:
-                # Default: 90° CW (k=-1)
+                # 90° CW rotation
                 rotated = np.rot90(frame, k=-1)
-                logger.debug(f"[FRAME] Rotation mode 0 (90° CW): {frame.shape} → {rotated.shape}")
+                logger.debug(f"[FRAME] Mode 0: 90° CW → {rotated.shape}")
             elif rotation_mode == 1:
-                # Alternative: 90° CCW (k=1)
-                rotated = np.rot90(frame, k=1)
-                logger.debug(f"[FRAME] Rotation mode 1 (90° CCW): {frame.shape} → {rotated.shape}")
-            elif rotation_mode == 2:
-                # Alternative: 180° (k=2)
-                rotated = np.rot90(frame, k=2)
-                logger.debug(f"[FRAME] Rotation mode 2 (180°): {frame.shape} → {rotated.shape}")
-            else:
-                # Mode 3+: No rotation
+                # NO rotation - let KMS handle it
                 rotated = frame
-                logger.debug(f"[FRAME] Rotation mode 3+ (none): {frame.shape} (no rotation)")
+                logger.debug(f"[FRAME] Mode 1: No rotation (KMS only) → {rotated.shape}")
+            elif rotation_mode == 2:
+                # 90° CCW rotation
+                rotated = np.rot90(frame, k=1)
+                logger.debug(f"[FRAME] Mode 2: 90° CCW → {rotated.shape}")
+            else:
+                # 180° rotation
+                rotated = np.rot90(frame, k=2)
+                logger.debug(f"[FRAME] Mode 3: 180° → {rotated.shape}")
             
-            # Swap axes for pygame.surfarray.make_surface (expects width, height, channels)
+            # Convert to pygame surface
             swapped = np.swapaxes(rotated, 0, 1)
-            logger.debug(f"[FRAME] After swapaxes: {swapped.shape}")
-            
-            # Create pygame surface
             surf = pygame.surfarray.make_surface(swapped)
             logger.debug(f"[FRAME] pygame surface: {surf.get_size()}")
             
-            # Scale to display dimensions (480x800 portrait)
+            # Scale to display dimensions
             if surf.get_size() != (screen_w, screen_h):
                 logger.debug(f"[FRAME] Scaling {surf.get_size()} → {(screen_w, screen_h)}")
                 surf = pygame.transform.scale(surf, (screen_w, screen_h))
             
-            logger.debug(f"[FRAME] ✓ Surface ready: {surf.get_size()}")
+            logger.debug(f"[FRAME] ✓ Final: {surf.get_size()}")
             return surf
         except Exception as e:
             logger.error(f"[FRAME] ✗ Conversion failed: {e}", exc_info=True)

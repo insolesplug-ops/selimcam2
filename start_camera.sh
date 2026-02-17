@@ -8,6 +8,12 @@ cd "$SCRIPT_DIR" || exit 1
 export PYTHONUNBUFFERED=1
 export SELIMCAM_QUIET=true
 export SDL_VIDEODRIVER="kmsdrm"
+
+# KMS Rotation Modes (test if display is wrong orientation):
+# "0" = No KMS rotation (app must handle via frame rotation)
+# "1" = 90° CW (default for portrait mode)
+# "2" = 180°
+# "3" = 90° CCW
 export SDL_VIDEO_KMSDRM_ROTATION="1"
 export SDL_FBDEV_ROTATION="1"
 
