@@ -463,9 +463,25 @@ class CameraApp:
             pass
 
     def _rotate_touch(self, px: int, py: int) -> tuple:
-        """Forced touch transform (audit): mapped_x = y_raw, mapped_y = 480 - x_raw."""
-        lx = int(py)
-        ly = int(480 - px)
+        """Transform touch input based on active rotation mode."""
+        rotation_mode = self.config.get('camera', 'rotation_test', default=0)
+        
+        if rotation_mode == 0:
+            # Mode 0: 90° CW
+            lx = int(py)
+            ly = int(480 - px)
+        elif rotation_mode == 1:
+            # Mode 1: No rotation (identity)
+            lx = int(px)
+            ly = int(py)
+        elif rotation_mode == 2:
+            # Mode 2: 90° CCW (THIS IS YOUR SETUP!)
+            lx = int(800 - py)
+            ly = int(px)
+        else:  # Mode 3
+            # Mode 3: 180° flip
+            lx = int(480 - px)
+            ly = int(800 - py)
 
         lx = max(0, min(LOGICAL_W - 1, lx))
         ly = max(0, min(LOGICAL_H - 1, ly))

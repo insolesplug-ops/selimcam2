@@ -68,7 +68,7 @@ class CameraScene:
         
         # Auto-rotation test mode (cycles every 10 seconds)
         self.rotation_test_timer = 0.0
-        self.rotation_test_auto_cycle = True  # Set to False to disable auto-cycling
+        self.rotation_test_auto_cycle = False  # DISABLED - Mode 2 is correct!
         
         logger.info("[CameraScene] Initialized")
     
