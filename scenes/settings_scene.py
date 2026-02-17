@@ -48,21 +48,28 @@ class SettingsScene:
         print("[SettingsScene] Initialized")
     
     def _build_settings_list(self):
-        """Build complete settings list."""
+        """Build simplified settings list - only working options."""
         self.settings = [
             {
-                'label': 'Brightness Mode',
+                'label': 'Brightness',
                 'type': 'choice',
                 'config_path': ('display', 'brightness_mode'),
                 'choices': ['dark', 'medium', 'bright', 'auto'],
                 'default': 'medium'
             },
             {
-                'label': 'Info Display',
+                'label': 'Filter',
                 'type': 'choice',
-                'config_path': ('ui', 'info_display'),
-                'choices': ['off', 'minimal', 'extended'],
-                'default': 'minimal'
+                'config_path': ('filter', 'active'),
+                'choices': ['none', 'warm', 'cold', 'monochrom'],
+                'default': 'none'
+            },
+            {
+                'label': 'Flash Mode',
+                'type': 'choice',
+                'config_path': ('flash', 'mode'),
+                'choices': ['off', 'on', 'auto'],
+                'default': 'off'
             },
             {
                 'label': 'Grid Overlay',
@@ -77,46 +84,12 @@ class SettingsScene:
                 'default': False
             },
             {
-                'label': 'Filter',
+                'label': 'Info Display',
                 'type': 'choice',
-                'config_path': ('filter', 'active'),
-                'choices': ['none', 'night_vision', 'red', 'green', 'pink', 'warm', 'cold', 'monochrom', 'orange', 'yellow'],
-                'default': 'none'
+                'config_path': ('ui', 'info_display'),
+                'choices': ['off', 'minimal'],
+                'default': 'minimal'
             },
-            {
-                'label': 'ISO (Fake Gain)',
-                'type': 'choice',
-                'config_path': ('filter', 'iso_fake'),
-                'choices': [100, 200, 400, 800],
-                'default': 400
-            },
-            {
-                'label': 'Flash Mode',
-                'type': 'choice',
-                'config_path': ('flash', 'mode'),
-                'choices': ['off', 'on', 'auto'],
-                'default': 'off'
-            },
-            {
-                'label': 'Auto Flash Lux',
-                'type': 'int',
-                'config_path': ('flash', 'auto_threshold_lux'),
-                'min': 10,
-                'max': 200,
-                'step': 10,
-                'default': 60
-            },
-            {
-                'label': 'Date & Time',
-                'type': 'datetime',
-                'config_path': ('datetime', 'manual'),
-                'default': None
-            },
-            {
-                'label': 'About',
-                'type': 'info',
-                'value': 'SelimCam v2.0'
-            }
         ]
     
     def on_enter(self):
@@ -162,6 +135,8 @@ class SettingsScene:
             if clicked_index is not None:
                 self.selected_index = clicked_index
                 self._activate_setting()
+                # Auto-increment value by touching (easier than encoder)
+                self._adjust_value(1)
             # Note: Back button hitbox is handled by main.py HitboxEngine
     
     def _get_clicked_setting(self, x: int, y: int) -> int:
