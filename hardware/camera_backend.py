@@ -8,7 +8,6 @@ import sys
 import logging
 import numpy as np
 import threading
-import pygame
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -68,9 +67,9 @@ class CameraBackend:
         self.is_running   = False
         self._frame_lock  = threading.Lock()
         self._last_frame: Optional[np.ndarray] = None
-        self._last_surface: Optional[pygame.Surface] = None
         self._capture_thread: Optional[threading.Thread] = None
         self._capture_stop = threading.Event()
+        self._capture_error_count = 0
         self._Picamera2   = Picamera2
 
         self.camera = Picamera2()
@@ -103,14 +102,14 @@ class CameraBackend:
                     frame_rgb = frame
 
                 frame_contiguous = np.ascontiguousarray(frame_rgb)
-                h, w = frame_contiguous.shape[:2]
-                surface = pygame.image.frombuffer(frame_contiguous.data, (w, h), "RGB").copy()
 
                 with self._frame_lock:
                     self._last_frame = frame_contiguous
-                    self._last_surface = surface
+                self._capture_error_count = 0
             except Exception as exc:
-                logger.debug("Camera request loop error: %s", exc)
+                self._capture_error_count += 1
+                if self._capture_error_count <= 5 or self._capture_error_count % 30 == 0:
+                    logger.error("Camera request loop error (%d): %s", self._capture_error_count, exc)
                 time.sleep(0.01)
 
     def _configure_capture(self):
@@ -153,12 +152,6 @@ class CameraBackend:
         with self._frame_lock:
             return self._last_frame.copy() if self._last_frame is not None else None
 
-    def get_preview_surface(self) -> Optional[pygame.Surface]:
-        if not self.is_running:
-            return None
-        with self._frame_lock:
-            return self._last_surface
-
     def capture_array(self) -> Optional[np.ndarray]:
         if not self.is_running:
             return None
@@ -183,8 +176,8 @@ class CameraBackend:
             self.camera.stop()
             if was_running:
                 self._configure_preview()
-                self.camera.start()
-                self.is_running = True
+                self.is_running = False
+                self.start_preview()
             logger.info("Camera photo saved: %s", filepath)
             return True
         except Exception as e:

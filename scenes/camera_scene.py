@@ -75,8 +75,7 @@ class CameraScene:
     
     def on_exit(self):
         """Stop camera preview."""
-        self.app.config.set('zoom', 'current', value=self.zoom_current, save=True)
-    
+            screen_w, screen_h = self.app.logical_surface.get_size()
     def handle_event(self, event: pygame.event.Event):
         """Handle input events."""
         from core.state_machine import AppEvent
@@ -104,8 +103,7 @@ class CameraScene:
                 logger.info("Opening Settings")
                 self.app.state_machine.handle_event(AppEvent.OPEN_SETTINGS)
                 if self.app.haptic and self.app.haptic.available:
-                    self.app.haptic.play_effect(10, 0.5)
-            
+            screen_w, screen_h = self.app.logical_surface.get_size()
             elif hit_id == 'gallery':
                 logger.info("Opening Gallery")
                 self.app.state_machine.handle_event(AppEvent.OPEN_GALLERY)
@@ -149,8 +147,7 @@ class CameraScene:
             use_flash = True
         elif flash_mode == 'auto':
             lux = self.app.sensor_thread.get_lux() if hasattr(self.app, 'sensor_thread') else None
-            if lux is None and self.app.light_sensor:
-                lux = self.app.light_sensor.read_lux()
+            screen_w, screen_h = self.app.logical_surface.get_size()
             
             threshold = self.app.config.get('flash', 'auto_threshold_lux', default=60)
             
@@ -365,8 +362,7 @@ class CameraScene:
     def _frame_to_surface(self, frame: np.ndarray) -> Optional[pygame.Surface]:
         """Convert numpy frame to pygame surface."""
         try:
-            screen_w = self.app.config.get('display', 'width', default=480)
-            screen_h = self.app.config.get('display', 'height', default=800)
+            screen_w, screen_h = self.app.logical_surface.get_size()
             
             surf = pygame.surfarray.make_surface(np.swapaxes(frame, 0, 1))
             surf = pygame.transform.scale(surf, (screen_w, screen_h))

@@ -40,14 +40,15 @@ print("[Platform] Raspberry Pi 3A+ - FORCE MODE")
 # ============================================================
 # DISPLAY ROTATION CONSTANTS
 # ============================================================
-# Global software orientation fix:
-# - Logical and physical app space run portrait (480x800)
-# - Final blit rotates complete surface by 180°
+# Global software rotation:
+# - Logical app space is portrait (480x800)
+# - Physical framebuffer is landscape (800x480)
+# - Final blit rotates logical surface 90° clockwise
 
 LOGICAL_W  = 480
 LOGICAL_H  = 800
-PHYSICAL_W = 480
-PHYSICAL_H = 800
+PHYSICAL_W = 800
+PHYSICAL_H = 480
 
 # ============================================================
 # CORE IMPORTS
@@ -363,7 +364,7 @@ class CameraApp:
         logger.info(" SelimCam v2.0 - PRODUCTION BUILD")
         logger.info(" Platform: Raspberry Pi 3A+")
         logger.info(f" Display: logical {LOGICAL_W}x{LOGICAL_H}, physical {PHYSICAL_W}x{PHYSICAL_H}")
-        logger.info(" Rotation: software 180 degrees")
+        logger.info(" Rotation: software 90 degrees clockwise")
         logger.info("=" * 70)
 
         self.perf_monitor = PerformanceMonitor()
@@ -379,7 +380,7 @@ class CameraApp:
         ])
         self.config = ConfigManager()
 
-        # Physical framebuffer (portrait)
+        # Physical framebuffer (landscape)
         flags = pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.FULLSCREEN
         self.screen = pygame.display.set_mode((PHYSICAL_W, PHYSICAL_H), flags)
 
@@ -458,12 +459,13 @@ class CameraApp:
     # ── TOUCH KOORDINATEN (PORTRAIT) ────────────────────────────────
     def _rotate_touch(self, px: int, py: int) -> tuple:
         """
-        180-degree input remap for flipped render surface.
-            new_x = screen_width - old_x
-            new_y = screen_height - old_y
+        Physical landscape coordinates -> logical portrait coordinates.
+        Clockwise mapping:
+            new_x = y
+            new_y = width - x
         """
-        lx = int(LOGICAL_W - px)
-        ly = int(LOGICAL_H - py)
+        lx = int(py)
+        ly = int(PHYSICAL_W - px)
         # Clamp
         lx = max(0, min(LOGICAL_W - 1, lx))
         ly = max(0, min(LOGICAL_H - 1, ly))
@@ -751,11 +753,24 @@ class CameraApp:
                         px = int(event.x * PHYSICAL_W)
                         py = int(event.y * PHYSICAL_H)
                         lx, ly = self._rotate_touch(px, py)
+                        rotated_event = pygame.event.Event(
+                            pygame.MOUSEBUTTONDOWN,
+                            {
+                                "pos": (lx, ly),
+                                "button": 1,
+                                "touch": True,
+                                "window": getattr(event, "window", None),
+                            },
+                        )
                         scene_name = self.state_machine.current_state.value
                         result = self.hitbox_engine.hit_test(scene_name, lx, ly)
                         if result:
                             hitbox_id, action = result
                             self._execute_hitbox_action(action)
+                        else:
+                            scene = self.scenes.get(self.state_machine.current_state)
+                            if scene:
+                                scene.handle_event(rotated_event)
 
                     elif event.type == pygame.KEYDOWN:
                         self.power_manager.update_activity()
@@ -788,7 +803,7 @@ class CameraApp:
                     # Logger overlay auf logical_surface
                     logger.render_ui(self.logical_surface)
 
-                    rotated = pygame.transform.rotate(self.logical_surface, 180)
+                    rotated = pygame.transform.rotate(self.logical_surface, -90)
                     self.screen.blit(rotated, (0, 0))
 
                     pygame.display.update([pygame.Rect(0, 0, PHYSICAL_W, PHYSICAL_H)])
