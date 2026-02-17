@@ -380,16 +380,15 @@ class CameraScene:
         return frame[y1:y2, x1:x2]
     
     def _frame_to_surface(self, frame: np.ndarray) -> Optional[pygame.Surface]:
-        """Convert numpy frame to pygame surface with stable rotation + cover scaling.
+        """Convert numpy frame to portrait preview surface (top 480x640 area).
 
-        rotation_test values:
-        - 0: 90° CW (default for portrait preview)
-        - 1: no rotation
-        - 2: 90° CCW
-        - 3: 180°
+        Requested behavior:
+        - Rotate 90° CW for portrait
+        - Apply additional 180° flip when image is upside down
+        - Fill the top preview area completely (480x640)
         """
         try:
-            screen_w, screen_h = self.app.logical_surface.get_size()
+            preview_w, preview_h = 480, 640
 
             rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
 
@@ -415,21 +414,24 @@ class CameraScene:
                 if self._debug_frame_logs:
                     logger.debug(f"[FRAME] Mode 3: 180° → {oriented.get_size()}")
 
-            # Aspect-preserving cover scale (no stretching)
+            # Additional 180° flip (requested quick-fix for upside-down image)
+            oriented = pygame.transform.rotate(oriented, 180)
+
+            # Aspect-preserving cover scale into preview area 480x640
             src_w, src_h = oriented.get_size()
-            scale = max(screen_w / src_w, screen_h / src_h)
+            scale = max(preview_w / src_w, preview_h / src_h)
             scaled_w = max(1, int(round(src_w * scale)))
             scaled_h = max(1, int(round(src_h * scale)))
             scaled = pygame.transform.scale(oriented, (scaled_w, scaled_h))
 
-            # Center crop to final portrait canvas
-            x = max(0, (scaled_w - screen_w) // 2)
-            y = max(0, (scaled_h - screen_h) // 2)
-            final = pygame.Surface((screen_w, screen_h))
+            # Center crop to final preview surface (480x640)
+            x = max(0, (scaled_w - preview_w) // 2)
+            y = max(0, (scaled_h - preview_h) // 2)
+            final = pygame.Surface((preview_w, preview_h))
             final.blit(scaled, (-x, -y))
 
             if self._debug_frame_logs:
-                logger.debug(f"[FRAME] Cover scale {src_w}x{src_h} -> {scaled_w}x{scaled_h}, crop ({x},{y}) -> {screen_w}x{screen_h}")
+                logger.debug(f"[FRAME] Cover scale {src_w}x{src_h} -> {scaled_w}x{scaled_h}, crop ({x},{y}) -> {preview_w}x{preview_h}")
             return final
         except Exception as e:
             logger.error(f"[FRAME] ✗ Conversion failed: {e}", exc_info=True)

@@ -29,6 +29,10 @@ if not os.environ.get("XDG_RUNTIME_DIR"):
     fallback_runtime = f"/run/user/{os.getuid()}"
     os.environ["XDG_RUNTIME_DIR"] = fallback_runtime if os.path.isdir(fallback_runtime) else "/tmp"
 
+# Force SDL framebuffer + rotation mapping before pygame.init()
+os.environ['SDL_FBDEV'] = '/dev/fb0'
+os.environ['SDL_VIDEO_KMSDRM_ROTATION'] = '270'
+
 # ============================================================
 # PLATFORM - HARDCODED PI MODE
 # ============================================================
@@ -459,19 +463,9 @@ class CameraApp:
             pass
 
     def _rotate_touch(self, px: int, py: int) -> tuple:
-        """Map raw touch to logical portrait coordinates.
-
-        Default mapping (swap axes) for drivers reporting landscape coordinates:
-        x_final = y_raw
-        y_final = LOGICAL_H - x_raw
-        """
-        swap_axes = self.config.get('touch', 'swap_axes', default=True)
-        if swap_axes:
-            lx = int(py)
-            ly = int(LOGICAL_H - px)
-        else:
-            lx = int(px)
-            ly = int(py)
+        """Forced touch transform (audit): mapped_x = y_raw, mapped_y = 480 - x_raw."""
+        lx = int(py)
+        ly = int(480 - px)
 
         lx = max(0, min(LOGICAL_W - 1, lx))
         ly = max(0, min(LOGICAL_H - 1, ly))
