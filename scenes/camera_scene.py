@@ -66,6 +66,10 @@ class CameraScene:
             self.font_regular = pygame.font.SysFont("Arial", 20)
             self.font_bold = pygame.font.SysFont("Arial", 24, bold=True)
         
+        # Auto-rotation test mode (cycles every 10 seconds)
+        self.rotation_test_timer = 0.0
+        self.rotation_test_auto_cycle = True  # Set to False to disable auto-cycling
+        
         logger.info("[CameraScene] Initialized")
     
     def on_enter(self):
@@ -227,6 +231,16 @@ class CameraScene:
     
     def update(self, dt: float):
         """Update scene logic."""
+        # AUTO-ROTATION TEST MODE: cycle every 10 seconds
+        if self.rotation_test_auto_cycle:
+            self.rotation_test_timer += dt
+            if self.rotation_test_timer >= 10.0:
+                current_mode = self.app.config.get('camera', 'rotation_test', default=0)
+                next_mode = (current_mode + 1) % 4
+                self.app.config.set('camera', 'rotation_test', value=next_mode)
+                logger.info(f"[AUTO-TEST] Rotation mode: {current_mode} → {next_mode}")
+                self.rotation_test_timer = 0.0
+        
         # Smooth zoom
         if abs(self.zoom_target - self.zoom_current) > 0.001:
             self.zoom_current += (self.zoom_target - self.zoom_current) * self.zoom_smooth
@@ -308,9 +322,13 @@ class CameraScene:
             tilt = self.app.sensor_thread.get_tilt() if hasattr(self.app, 'sensor_thread') else 0.0
             self.app.grid_overlay.render_level(screen, tilt)
         
-        # ROTATION MODE INDICATOR (bottom-left corner, white text)
+        # ROTATION MODE INDICATOR + AUTO-TEST COUNTDOWN (bottom-left corner, white text)
         rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
-        mode_text = f"ROTATION: {rotation_mode}"
+        if self.rotation_test_auto_cycle:
+            remaining_time = max(0, 10.0 - self.rotation_test_timer)
+            mode_text = f"ROTATION: {rotation_mode} (auto in {remaining_time:.1f}s)"
+        else:
+            mode_text = f"ROTATION: {rotation_mode} (manual)"
         mode_surf = self.font_regular.render(mode_text, True, (255, 255, 255))
         screen.blit(mode_surf, (10, 760))  # Bottom-left, 30px from bottom
         
