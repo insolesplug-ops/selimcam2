@@ -29,7 +29,10 @@
     "grid_enabled": false,
     "level_enabled": false,
     "info_display": "minimal",
-    "freeze_duration_ms": 700
+    "freeze_duration_ms": 700,
+    "touch_debug_overlay": false,
+    "fps_counter_enabled": false,
+    "rotation_text_enabled": false
   },
   "zoom": {
     "current": 1.0,

@@ -905,11 +905,14 @@ class CameraApp:
                     # Logger overlay auf logical_surface
                     logger.render_ui(self.logical_surface)
 
-                    # Touch debug overlay: red point where mapped touch is processed
-                    if self.config.get('ui', 'touch_debug_overlay', default=True):
-                        if self.last_touch_point and (time.time() - self.last_touch_ts) < 1.2:
-                            pygame.draw.circle(self.logical_surface, (255, 0, 0), self.last_touch_point, 10)
-                            pygame.draw.circle(self.logical_surface, (255, 255, 255), self.last_touch_point, 12, 2)
+                    # Touch debug overlay: red point where mapped touch is processed (disabled by default for production)
+                    try:
+                        if self.config.get('ui', 'touch_debug_overlay', default=False):
+                            if self.last_touch_point and (time.time() - self.last_touch_ts) < 1.2:
+                                pygame.draw.circle(self.logical_surface, (255, 0, 0), self.last_touch_point, 10)
+                                pygame.draw.circle(self.logical_surface, (255, 255, 255), self.last_touch_point, 12, 2)
+                    except Exception as e:
+                        logger.error(f"Touch debug overlay error: {e}")
 
                     # ROTATE VIRTUAL SURFACE 90° CCW (270° CW) FOR PHYSICAL 800x480 DISPLAY
                     rotated_surface = pygame.transform.rotate(self.logical_surface, 90)

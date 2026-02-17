@@ -312,14 +312,20 @@ class CameraScene:
             self.app.grid_overlay.render_level(screen, tilt)
         
         # ROTATION MODE INDICATOR + AUTO-TEST COUNTDOWN (bottom-left corner, white text)
-        rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
-        if self.rotation_test_auto_cycle:
-            remaining_time = max(0, 10.0 - self.rotation_test_timer)
-            mode_text = f"ROTATION: {rotation_mode} (auto in {remaining_time:.1f}s)"
-        else:
-            mode_text = f"ROTATION: {rotation_mode} (manual)"
-        mode_surf = self.font_regular.render(mode_text, True, (255, 255, 255))
-        screen.blit(mode_surf, (10, 760))  # Bottom-left, 30px from bottom
+        # Render ROTATION text only if enabled in config
+        rotation_text_enabled = self.app.config.get('ui', 'rotation_text_enabled', default=False)
+        if rotation_text_enabled:
+            rotation_mode = self.app.config.get('camera', 'rotation_test', default=0)
+            if self.rotation_test_auto_cycle:
+                remaining_time = max(0, 10.0 - self.rotation_test_timer)
+                mode_text = f"ROTATION: {rotation_mode} (auto in {remaining_time:.1f}s)"
+            else:
+                mode_text = f"ROTATION: {rotation_mode} (manual)"
+            try:
+                mode_surf = self.font_regular.render(mode_text, True, (255, 255, 255))
+                screen.blit(mode_surf, (10, 760))  # Bottom-left, 30px from bottom
+            except Exception as e:
+                logger.error(f"Failed to render ROTATION text: {e}")
         
         # Top info bar (optional debug info) - render BEFORE overlay so overlay can cover it
         info_mode = self.app.config.get('ui', 'info_display', default='minimal')
@@ -341,10 +347,14 @@ class CameraScene:
 
                 screen.blit(flash_overlay, (0, 0))
         
-        # FPS debug
-        if self.fps > 0:
-            fps_surf = self.font_regular.render(f"{self.fps} FPS", True, (0, 255, 0))
-            screen.blit(fps_surf, (10, 40))
+        # FPS counter - only render if enabled in config
+        fps_counter_enabled = self.app.config.get('ui', 'fps_counter_enabled', default=False)
+        if fps_counter_enabled and self.fps > 0:
+            try:
+                fps_surf = self.font_regular.render(f"{self.fps} FPS", True, (0, 255, 0))
+                screen.blit(fps_surf, (10, 40))
+            except Exception as e:
+                logger.error(f"Failed to render FPS counter: {e}")
         
         # UI BUTTONS OVERLAY (Settings, Gallery, Flash)
         self._render_ui_buttons(screen)
