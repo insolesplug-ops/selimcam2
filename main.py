@@ -694,12 +694,12 @@ class CameraApp:
                     # Logger overlay auf logical_surface
                     logger.render_ui(self.logical_surface)
 
-                    # ══ SOFTWARE ROTATION 90° RECHTS ══════════════════
+                    # == SOFTWARE ROTATION 90° RECHTS ==================
                     # logical_surface (480x800) → rotate(-90°) → (800x480)
                     # Auf physisches Display (800x480) blitten
                     rotated = pygame.transform.rotate(self.logical_surface, -90)
                     self.screen.blit(rotated, (0, 0))
-                    # ══════════════════════════════════════════════════
+                    # ==================================================
 
                     pygame.display.flip()
                 else:
@@ -798,7 +798,7 @@ if __name__ == '__main__':
 # 📋 **WAS GEÄNDERT WURDE - ÜBERSICHT**
 ```
 main.py Änderungen:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---------------------------------------------------
 ✅ IS_RASPBERRY_PI = True  (hardcoded, kein detect_platform)
 ✅ IS_RASPBERRY_PI = False VERBOTEN im except Block
 ✅ SOFTWARE ROTATION 90° rechts via pygame.transform.rotate

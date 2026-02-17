@@ -1,13 +1,16 @@
-"""CameraBackend - REAL HARDWARE - 8MP IMX219 - KEINE STUBS"""
+"""
+CameraBackend - REAL HARDWARE
+8MP IMX219 via PiCamera2 - KEINE STUBS
+Pi 3A+ Optimiert
+"""
 import time
 import numpy as np
 import threading
 from typing import Optional, Tuple
-from picamera2 import Picamera2
 
 
 class CameraBackend:
-    """Real PiCamera2 - 8MP IMX219 - no stubs, no fallbacks"""
+    """Real PiCamera2 - 8MP IMX219"""
 
     def __init__(
         self,
@@ -15,18 +18,21 @@ class CameraBackend:
         capture_size: Tuple[int, int] = (3280, 2464),
         preview_fps: int = 24
     ):
+        from picamera2 import Picamera2
         print("[CameraBackend] Init REAL PiCamera2 - 8MP IMX219")
+
         self.preview_size = preview_size
         self.capture_size = capture_size
         self.preview_fps  = preview_fps
         self.is_running   = False
         self._frame_lock  = threading.Lock()
         self._last_frame: Optional[np.ndarray] = None
+        self._Picamera2   = Picamera2
 
         self.camera = Picamera2()
         self._configure_preview()
 
-        print(f"[CameraBackend] ✓ Ready: {preview_size[0]}x{preview_size[1]} @ {preview_fps}fps")
+        print(f"[CameraBackend] Ready: {preview_size[0]}x{preview_size[1]} @ {preview_fps}fps")
 
     def _configure_preview(self):
         cfg = self.camera.create_preview_configuration(
@@ -46,10 +52,14 @@ class CameraBackend:
     def start_preview(self):
         if self.is_running:
             return
-        self.camera.start()
-        self.is_running = True
-        time.sleep(0.15)
-        print("[CameraBackend] ✓ Preview started")
+        try:
+            self.camera.start()
+            self.is_running = True
+            time.sleep(0.15)
+            print("[CameraBackend] Preview started")
+        except Exception as e:
+            print(f"[CameraBackend] Start failed: {e}")
+            raise
 
     def stop_preview(self):
         if not self.is_running:
@@ -94,10 +104,10 @@ class CameraBackend:
                 self._configure_preview()
                 self.camera.start()
                 self.is_running = True
-            print(f"[CameraBackend] ✓ Photo: {filepath}")
+            print(f"[CameraBackend] Photo saved: {filepath}")
             return True
         except Exception as e:
-            print(f"[CameraBackend] ✗ Photo failed: {e}")
+            print(f"[CameraBackend] Photo failed: {e}")
             if was_running:
                 try:
                     self._configure_preview()
