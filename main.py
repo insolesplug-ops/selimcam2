@@ -12,6 +12,7 @@ import signal
 import threading
 import traceback
 import json
+import subprocess
 from pathlib import Path
 from typing import Optional
 from collections import deque
@@ -736,6 +737,11 @@ class CameraApp:
             if hasattr(scene, '_capture_photo'):
                 scene._capture_photo()
 
+    def request_shutdown(self):
+        """Request graceful shutdown from UI (e.g., Settings menu)."""
+        logger.info("Shutdown request from UI")
+        self.power_manager.request_shutdown()
+
     def _signal_handler(self, sig, frame):
         logger.info(f"Signal {sig}, shutting down...")
         self.running = False
@@ -966,9 +972,14 @@ class CameraApp:
             self.sensor_thread.join(timeout=1.0)
         self.config.save()
         try:
-            os.system("sudo shutdown -h now")
+            # Use subprocess for more reliable command execution
+            # Requires: sudo /home/pi/selimcam2/setup_shutdown_sudo.sh to be run once
+            logger.info("Executing shutdown command...")
+            subprocess.call(["sudo", "shutdown", "-h", "now"])
         except Exception as e:
-            logger.error(f"Shutdown failed: {e}")
+            logger.error(f"Shutdown command failed: {e}")
+            # If shutdown fails, at least exit the app gracefully
+            logger.error("Shutdown failed - exiting app")
         self.running = False
 
     def cleanup(self):

@@ -90,6 +90,12 @@ class SettingsScene:
                 'choices': ['off', 'minimal'],
                 'default': 'minimal'
             },
+            {
+                'label': 'Shutdown Device',
+                'type': 'action',
+                'action': 'shutdown',
+                'description': 'Gracefully shut down Pi'
+            },
         ]
     
     def on_enter(self):
@@ -158,6 +164,13 @@ class SettingsScene:
     def _activate_setting(self):
         """Activate/edit current setting."""
         setting = self.settings[self.selected_index]
+        
+        if setting['type'] == 'action':
+            # Handle action buttons
+            action = setting.get('action')
+            if action == 'shutdown':
+                self.app.request_shutdown()
+            return
         
         if setting['type'] in ['choice', 'int', 'bool']:
             self.edit_mode = True
