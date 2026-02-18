@@ -6,28 +6,28 @@
   "hitboxes": [
     {
       "id": "settings",
-      "x": 135,
-      "y": 740,
-      "w": 50,
-      "h": 50,
+      "x": 92,
+      "y": 710,
+      "w": 75,
+      "h": 75,
       "action": "open_settings",
       "description": "Settings button"
     },
     {
       "id": "flash",
-      "x": 215,
-      "y": 740,
-      "w": 50,
-      "h": 50,
+      "x": 202,
+      "y": 710,
+      "w": 75,
+      "h": 75,
       "action": "toggle_flash",
       "description": "Flash mode toggle"
     },
     {
       "id": "gallery",
-      "x": 295,
-      "y": 740,
-      "w": 50,
-      "h": 50,
+      "x": 312,
+      "y": 710,
+      "w": 75,
+      "h": 75,
       "action": "open_gallery",
       "description": "Gallery button"
     }
