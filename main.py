@@ -468,13 +468,10 @@ class CameraApp:
         Physical display is 800x480 (landscape).
         Logical app is 480x800 (portrait).
         
-        We rotate logical +90° CCW to get physical display.
-        Inverse transform: physical (px, py) → logical (lx, ly)
-        
-        For +90° rotation: (px, py) → (py, 800-px)
+        Correct mapping: (px, py) → (800-py, px)
         """
-        lx = int(py)
-        ly = int(800 - px)
+        lx = int(800 - py)
+        ly = int(px)
 
         lx = max(0, min(LOGICAL_W - 1, lx))
         ly = max(0, min(LOGICAL_H - 1, ly))
@@ -727,7 +724,9 @@ class CameraApp:
         self.power_manager.encoder_button_pressed()
 
     def _encoder_button_release(self, duration: float):
+        logger.debug(f"Encoder button released, duration: {duration}s")
         if self.power_manager.encoder_button_released():
+            logger.info("SHUTDOWN REQUEST from encoder button")
             self.state_machine.handle_event(AppEvent.SHUTDOWN_REQUEST)
 
     def _shutter_press(self):

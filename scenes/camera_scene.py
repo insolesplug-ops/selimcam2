@@ -496,13 +496,28 @@ class CameraScene:
     def _render_ui_buttons(self, screen: pygame.Surface):
         """Render UI button overlays from assets at exact hitbox coordinates."""
         try:
-            # SETTINGS - (248, 735) 73x48
+            # Bottom button bar - centered, three buttons side by side
+            button_y = 740  # From bottom: 800 - 60 = 740
+            button_h = 50   # Button height
+            button_w = 50   # Button width
+            button_spacing = 30  # Gap between buttons
+            
+            # Calculate starting X to center buttons horizontally
+            total_width = 3 * button_w + 2 * button_spacing
+            start_x = (480 - total_width) // 2  # Center on 480px width
+            
+            # SETTINGS - Left button
+            settings_x = start_x
             settings_overlay = self.app.resource_manager.get_image("ui/settings.png")
             if settings_overlay:
-                settings_scaled = pygame.transform.scale(settings_overlay, (73, 48))
-                screen.blit(settings_scaled, (248, 735))
+                settings_scaled = pygame.transform.scale(settings_overlay, (button_w, button_h))
+                screen.blit(settings_scaled, (settings_x, button_y))
+                logger.debug(f"[UI] Settings button at ({settings_x}, {button_y})")
+            else:
+                logger.warning("[UI] Settings overlay not loaded")
             
-            # FLASH - (321, 735) 73x48
+            # FLASH - Middle button
+            flash_x = start_x + button_w + button_spacing
             flash_mode = self.app.config.get('flash', 'mode', default='off')
             if flash_mode == 'on':
                 flash_overlay = self.app.resource_manager.get_image("ui/flash on.png")
@@ -512,14 +527,23 @@ class CameraScene:
                 flash_overlay = self.app.resource_manager.get_image("ui/flash off.png")
             
             if flash_overlay:
-                flash_scaled = pygame.transform.scale(flash_overlay, (73, 48))
-                screen.blit(flash_scaled, (321, 735))
+                flash_scaled = pygame.transform.scale(flash_overlay, (button_w, button_h))
+                screen.blit(flash_scaled, (flash_x, button_y))
+                logger.debug(f"[UI] Flash button at ({flash_x}, {button_y})")
+            else:
+                logger.warning(f"[UI] Flash overlay not loaded (mode: {flash_mode})")
             
-            # GALLERY - (387, 735) 73x48
+            # GALLERY - Right button
+            gallery_x = start_x + 2 * (button_w + button_spacing)
             gallery_overlay = self.app.resource_manager.get_image("ui/gallery.png")
             if gallery_overlay:
-                gallery_scaled = pygame.transform.scale(gallery_overlay, (73, 48))
-                screen.blit(gallery_scaled, (387, 735))
+                gallery_scaled = pygame.transform.scale(gallery_overlay, (button_w, button_h))
+                screen.blit(gallery_scaled, (gallery_x, button_y))
+                logger.debug(f"[UI] Gallery button at ({gallery_x}, {button_y})")
+            else:
+                logger.warning("[UI] Gallery overlay not loaded")
                 
         except Exception as e:
-            logger.debug(f"[UI] Button overlay error: {e}")
+            logger.error(f"[UI] Button overlay fatal error: {e}")
+            import traceback
+            traceback.print_exc()
